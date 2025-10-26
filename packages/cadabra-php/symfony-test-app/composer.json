@@ -9,6 +9,7 @@
     "ext-sqlite3": "*",
     "cadabra/php": "*",
     "nyholm/psr7": "^1.8",
+    "doctrine/dbal": "^3.0",
     "doctrine/doctrine-bundle": "^2.11",
     "doctrine/doctrine-migrations-bundle": "^3.3",
     "doctrine/orm": "^2.14|^3.0",

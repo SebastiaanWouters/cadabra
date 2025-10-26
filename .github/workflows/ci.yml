@@ -144,6 +144,13 @@ jobs:
           APP_ENV: test
         run: composer install --prefer-dist --no-progress --no-interaction
 
+      - name: Create database schema
+        working-directory: packages/cadabra-php/symfony-test-app
+        run: |
+          php bin/console doctrine:database:create --if-not-exists --env=test
+          php bin/console doctrine:schema:create --env=test
+          php bin/console doctrine:fixtures:load --no-interaction --env=test
+
       - name: Run Symfony integration tests
         working-directory: packages/cadabra-php/symfony-test-app
         run: vendor/bin/phpunit --colors=always
