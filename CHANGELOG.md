@@ -5,12 +5,28 @@ All notable changes to Cadabra will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **BREAKING**: Extracted PHP package to separate repository
+  - PHP client and Symfony bundle now maintained at [cadabra-php](https://github.com/SebastiaanWouters/cadabra-php)
+  - Main repository now TypeScript-only (core library + HTTP server)
+  - Removed Makefile in favor of Bun scripts (`bun run <command>`)
+  - Simplified development workflow for TypeScript developers
+  - PHP package continues to be available on Packagist as `cadabra/php`
+- Updated all documentation to reflect new repository structure
+- Simplified CI/CD workflows (removed PHP testing from main repo)
+- Removed PHP runtime dependency (mise now only requires Bun)
+
+### Removed
+- PHP package (`packages/cadabra-php`) - moved to separate repository
+- Makefile - replaced with Bun package.json scripts
+- PHP-related CI/CD workflows from main repository
+
 ## [0.2.0] - 2025-10-26
 
 ### Added
 - Release version 0.2.0
-
-## [Unreleased]
 
 ## [0.1.0] - 2025-10-26
 

@@ -41,13 +41,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourusername/cadali.git",
+    "url": "https://github.com/SebastiaanWouters/cadabra.git",
     "directory": "packages/cadabra"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/cadali/issues"
+    "url": "https://github.com/SebastiaanWouters/cadabra/issues"
   },
-  "homepage": "https://github.com/yourusername/cadali/tree/main/packages/cadabra#readme",
+  "homepage": "https://github.com/SebastiaanWouters/cadabra/tree/main/packages/cadabra#readme",
   "engines": {
     "node": ">=18.0.0",
     "bun": ">=1.0.0"

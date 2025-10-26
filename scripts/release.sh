@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Simplified release script for Cadali monorepo
+# Release script for Cadabra (TypeScript)
 # Quality checks are performed by GitHub Actions CI
 
 # Colors for output
@@ -18,7 +18,7 @@ function print_usage() {
     cat <<EOF
 Usage: $0 <version> [--dry-run]
 
-Create a new release of Cadali packages.
+Create a new release of Cadabra packages.
 
 Arguments:
   version       Version number in semver format (e.g., 1.0.0)
@@ -31,7 +31,7 @@ Examples:
 This script will:
   1. Validate version format
   2. Check git working directory is clean
-  3. Update version in package.json and composer.json
+  3. Update version in package.json
   4. Update CHANGELOG.md
   5. Create git commit and tag
   6. Push to GitHub
@@ -108,16 +108,6 @@ function update_package_json() {
     }
 
     success "Updated package.json"
-}
-
-function update_composer_json() {
-    local version=$1
-    local file="$ROOT_DIR/packages/cadabra-php/composer.json"
-
-    step "Updating composer.json..."
-
-    info "composer.json doesn't track version (uses git tags)"
-    success "composer.json is managed by git tags"
 }
 
 function update_changelog() {
@@ -238,7 +228,7 @@ function show_next_steps() {
     echo "  5. Trigger Packagist update"
     echo ""
     echo -e "${BLUE}Monitor progress at:${NC}"
-    echo "  https://github.com/sebastiaanwouters/cadali/actions"
+    echo "  https://github.com/SebastiaanWouters/cadabra/actions"
     echo ""
     echo -e "${YELLOW}Important:${NC} If CI checks fail, the release will not be published."
     echo "You can delete the tag and fix issues if needed:"
@@ -289,7 +279,7 @@ function main() {
 
     # Show what we're doing
     echo -e "${BLUE}╔════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC}   Cadali Release Script v$VERSION"
+    echo -e "${BLUE}║${NC}   Cadabra Release Script v$VERSION"
     echo -e "${BLUE}╚════════════════════════════════════════╝${NC}"
     echo ""
 
@@ -297,7 +287,6 @@ function main() {
     validate_version "$VERSION"
     check_git_clean
     update_package_json "$VERSION"
-    update_composer_json "$VERSION"
     update_changelog "$VERSION"
     create_git_commit "$VERSION"
     create_git_tag "$VERSION"

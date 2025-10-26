@@ -1,5 +1,5 @@
 {
-  "name": "cadali",
+  "name": "cadabra",
   "type": "module",
   "private": true,
   "workspaces": [
@@ -14,12 +14,19 @@
     "typescript": "^5"
   },
   "scripts": {
-    "check": "ultracite check",
-    "fix": "ultracite fix",
-    "tsc": "bun run --workspaces tsc",
+    "install:all": "bun install",
+    "dev": "cd packages/cadabra && bun --hot run server.ts",
     "test": "bun run test:cadabra && bun run test:integration",
     "test:cadabra": "bun --filter cadabra test",
     "test:integration": "bun --filter cadabra-integration-tests test",
-    "bench": "bun --filter cadabra-integration-tests benchmark"
+    "bench": "bun --filter cadabra-integration-tests benchmark",
+    "check": "ultracite check",
+    "fix": "ultracite fix",
+    "tsc": "bun run --workspaces tsc",
+    "docker:build": "cd packages/cadabra && docker build -t cadabra:dev .",
+    "docker:run": "docker run -p 6942:6942 --rm --name cadabra-dev cadabra:dev",
+    "docker:up": "cd packages/cadabra && docker compose up -d",
+    "docker:down": "cd packages/cadabra && docker compose down",
+    "clean": "rm -rf node_modules packages/*/node_modules *.log"
   }
 }
