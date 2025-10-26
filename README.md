@@ -2,49 +2,34 @@
 
 A monorepo for Cadabra - an intelligent query cache system with automatic invalidation.
 
+## Quick Start
+
+```bash
+# 1. Install tool versions (PHP 8.4, Bun 1.3)
+mise install
+
+# 2. Install dependencies
+make install
+
+# 3. Run quality checks
+make test
+make lint
+```
+
+That's it! See [CLAUDE.md](./CLAUDE.md) for detailed development guide.
+
 ## Prerequisites
 
-This project uses [mise](https://mise.jdx.dev/) to manage tool versions. Make sure you have mise installed:
+This project uses [mise](https://mise.jdx.dev/) to manage tool versions:
 
 ```bash
+# Install mise
 curl https://mise.run | sh
+
+# Or via package manager
+brew install mise           # macOS
+apt install mise            # Ubuntu/Debian
 ```
-
-Or install via your package manager:
-```bash
-# macOS
-brew install mise
-
-# Ubuntu/Debian
-apt install mise
-
-# Other: https://mise.jdx.dev/getting-started.html
-```
-
-## Getting Started
-
-1. **Install tool versions** (PHP 8.4, Bun 1.3):
-   ```bash
-   mise install
-   ```
-
-2. **Verify versions**:
-   ```bash
-   php --version  # Should show 8.4.x
-   bun --version  # Should show 1.3.x
-   ```
-
-3. **Install dependencies**:
-   ```bash
-   bun install
-   ```
-
-4. **Run checks**:
-   ```bash
-   bun run check    # Run ultracite linter
-   bun run tsc      # TypeScript type checking
-   bun run test     # Run all tests
-   ```
 
 ## Project Structure
 
@@ -71,205 +56,139 @@ packages/
     └── README.md
 ```
 
-## Scripts
+## Common Commands
 
-### Root-level scripts
-
-- `bun run check` - Run ultracite linter on all packages
-- `bun run fix` - Auto-fix linting issues
-- `bun run tsc` - TypeScript type checking in all packages
-- `bun run test` - Run all tests (both packages)
-- `bun run test:cadabra` - Run core library tests
-- `bun run test:integration` - Run integration tests
-- `bun run bench` - Run performance benchmarks
-
-### Package-specific scripts
+**Use the Makefile as your primary interface:**
 
 ```bash
-# In packages/cadabra/
-bun run tsc    # Type check
-bun test       # Run tests
+# Development
+make install        # Install all dependencies (TypeScript + PHP)
+make test           # Run all tests (TypeScript + PHP)
+make test-ts        # Run only TypeScript tests
+make test-php       # Run only PHP tests
+make lint           # Check code style (all packages)
+make fix            # Auto-fix code style issues
+make dev            # Start Cadabra dev server
 
-# In packages/integration-tests/
-bun run setup      # Seed database
-bun run test       # Run integration tests
-bun run benchmark  # Run benchmarks
-bun run clean      # Clean database
-bun run all        # Clean, setup, and test
+# Docker
+make docker-build   # Build Docker image
+make docker-up      # Start docker-compose
+make docker-down    # Stop docker-compose
 
-# In packages/cadabra-php/
-composer install   # Install PHP dependencies
-vendor/bin/phpunit # Run PHP tests
+# Release
+make release VERSION=1.0.0   # Create new release
+
+# Help
+make help           # Show all available commands
 ```
 
 ## Development Workflow
 
-1. **Make changes** to TypeScript or PHP code
-2. **Run linter**: `bun run check`
-3. **Fix issues**: `bun run fix`
-4. **Type check**: `bun run tsc`
-5. **Run tests**: `bun run test`
-6. **Run benchmarks** (optional): `bun run bench`
+1. Make your code changes
+2. Run `make fix` to auto-fix code style
+3. Run `make lint` to check for remaining issues
+4. Run `make test` to verify all tests pass
+5. Commit your changes
 
-## Package Details
+See [CLAUDE.md](./CLAUDE.md) for comprehensive development guide.
 
-### packages/cadabra
+## Packages
 
-Core TypeScript library for SQL query analysis and cache key generation.
+This monorepo contains three packages:
 
-- SQL parsing and normalization
-- Cache key fingerprinting
-- Invalidation analysis
-- Zero runtime dependencies
+### packages/cadabra - TypeScript Core Library
 
-### packages/integration-tests
+SQL query analysis and cache key generation with HTTP REST API server.
 
-Comprehensive integration tests using an e-commerce database with:
-- 10,000 users
-- 50 categories
-- 5,000 products
-- 50,000 orders
-- 25,000 reviews
+**Documentation:**
+- [README.md](./packages/cadabra/README.md) - API usage and deployment
+- [CLAUDE.md](./packages/cadabra/CLAUDE.md) - Development guide
 
-Tests cover:
-- Simple queries (row lookups)
-- Complex JOINs (2-5 tables)
-- Aggregates (COUNT, SUM, AVG)
-- Pagination
-- Search queries
-- Cache hit/miss scenarios
-- Invalidation on writes
+### packages/cadabra-php - PHP Client & Symfony Bundle
 
-### packages/cadabra-php
+PHP client and Symfony bundle for Doctrine ORM integration with zero-code-change setup.
 
-PHP client and Symfony bundle for Doctrine ORM integration.
+**Documentation:**
+- [README.md](./packages/cadabra-php/README.md) - Installation and usage
+- [CLAUDE.md](./packages/cadabra-php/CLAUDE.md) - Development guide
 
-**Key Features**:
-- Zero-code-change integration
-- Intercepts at Doctrine DBAL level
-- Automatic cache invalidation
-- Transparent to ORM (lazy loading, events, etc.)
-- Smart caching heuristics
-- Per-table TTL configuration
+### packages/integration-tests - E2E Testing Suite
 
-See `packages/cadabra-php/README.md` for detailed documentation.
+Comprehensive integration tests with an e-commerce database (10K users, 5K products, 50K orders).
+
+**Documentation:**
+- [README.md](./packages/integration-tests/README.md) - Test suite details
 
 ## Testing
 
-All tests use Bun's built-in test runner:
-
 ```bash
-# Run all tests
-bun run test
-
-# Run specific package tests
-bun --filter cadabra test
-bun --filter cadabra-integration-tests test
-
-# Run benchmarks
-bun run bench
+make test           # Run all tests (TypeScript + PHP)
+make test-ts        # Run only TypeScript tests
+make test-php       # Run only PHP tests
 ```
 
-### Test Results
+TypeScript tests use Bun's built-in test runner. PHP tests use PHPUnit 10+.
 
-Integration tests verify:
-- ✅ All 103 tests passing
-- ✅ Cache hit rates: 80-90%
-- ✅ Performance gains: 3-10x faster with cache
-- ✅ Automatic invalidation on writes
-
-## Linting & Code Quality
-
-This project uses [ultracite](https://ultracite.dev/) (Biome-based) for linting:
+## Code Quality
 
 ```bash
-# Check all code
-bun run check
-
-# Auto-fix issues
-bun run fix
+make lint           # Check code style (Biome + PHP CS Fixer)
+make fix            # Auto-fix code style issues
 ```
 
-Configuration in `biome.jsonc`.
+Linting configuration:
+- TypeScript: `biome.jsonc` (via ultracite)
+- PHP: `.php-cs-fixer.dist.php` (PSR-12)
 
-## Tool Versions
+## Releasing
 
-Managed by mise (`.mise.toml`):
-- **PHP**: 8.4 (via ubi:adwinying/php)
-- **Bun**: 1.3
-
-The PHP package (`cadabra-php`) is compatible with PHP 8.1+ but we develop/test on 8.4.
-
-## Publishing & Deployment
-
-This project has comprehensive publishing infrastructure for all distribution channels:
-
-### Quick Release
+Create a new release with automatic quality checks and publishing:
 
 ```bash
-# Using Makefile (recommended)
 make release VERSION=1.0.0
-
-# Or use the release script directly
-./scripts/release.sh 1.0.0
 ```
 
-### Distribution Channels
+This will:
+1. Update version in `package.json` and `composer.json`
+2. Update `CHANGELOG.md`
+3. Create git commit and tag
+4. Push to GitHub
+5. Trigger automated publishing to NPM, Docker, and Packagist
 
-- **NPM Package**: `cadabra` - TypeScript library for Node.js/Bun
-- **Docker Container**: `ghcr.io/sebastiaanwouters/cadabra/cadabra` - Containerized server
-- **Packagist**: `cadabra/php` - PHP client and Symfony bundle
+See [PUBLISHING.md](./PUBLISHING.md) for detailed release process.
 
-### Automated Publishing
+## Using Published Packages
 
-GitHub Actions automatically handles:
-- ✅ **CI/CD** - Tests on every PR
-- ✅ **Docker** - Multi-platform images on tag push
-- ✅ **NPM** - Publish on GitHub release
-- ✅ **Packagist** - Auto-updates on tag push
-
-See [PUBLISHING.md](./PUBLISHING.md) for complete publishing guide.
-
-### Using Published Packages
-
-**TypeScript/Node.js:**
+### TypeScript/JavaScript
 ```bash
 npm install cadabra
-# or
 bun add cadabra
 ```
 
-**PHP/Symfony:**
+### PHP/Symfony
 ```bash
 composer require cadabra/php
 ```
 
-**Docker:**
+### Docker
 ```bash
-docker pull ghcr.io/sebastiaanwouters/cadabra/cadabra:latest
-docker run -p 6942:6942 ghcr.io/sebastiaanwouters/cadabra/cadabra
-```
-
-## Makefile Commands
-
-Convenient shortcuts for common tasks:
-
-```bash
-make help           # Show all available commands
-make install        # Install all dependencies
-make test           # Run all tests
-make lint           # Run linters
-make dev            # Start dev server
-make docker-build   # Build Docker image
-make release        # Prepare new release
+docker pull ghcr.io/sebastiaanwouters/cadabra:latest
+docker run -p 6942:6942 ghcr.io/sebastiaanwouters/cadabra:latest
 ```
 
 ## Documentation
 
-- [PUBLISHING.md](./PUBLISHING.md) - Complete publishing guide
+### Root Documentation
+- [README.md](./README.md) - This file (quick start and overview)
+- [CLAUDE.md](./CLAUDE.md) - Comprehensive development guide
+- [PUBLISHING.md](./PUBLISHING.md) - Release and publishing workflows
 - [CHANGELOG.md](./CHANGELOG.md) - Release history
-- [packages/cadabra/DEPLOYMENT.md](./packages/cadabra/DEPLOYMENT.md) - Deployment guide
-- [packages/cadabra-php/README.md](./packages/cadabra-php/README.md) - PHP integration guide
+
+### Package Documentation
+- [packages/cadabra/README.md](./packages/cadabra/README.md) - TypeScript library usage
+- [packages/cadabra/CLAUDE.md](./packages/cadabra/CLAUDE.md) - TypeScript package development
+- [packages/cadabra-php/README.md](./packages/cadabra-php/README.md) - PHP client usage
+- [packages/cadabra-php/CLAUDE.md](./packages/cadabra-php/CLAUDE.md) - PHP package development
 
 ## License
 

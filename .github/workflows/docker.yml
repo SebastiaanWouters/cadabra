@@ -4,16 +4,11 @@ on:
   push:
     tags:
       - 'v*.*.*'
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: sebastiaanwouters/cadabra/cadabra
+  IMAGE_NAME: sebastiaanwouters/cadabra
 
 jobs:
   # Run CI checks first
