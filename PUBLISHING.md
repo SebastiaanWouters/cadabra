@@ -51,26 +51,35 @@ sudo apt install gh  # Ubuntu/Debian
 
 ## Quick Start
 
-### Using the Makefile (Recommended)
+**The entire release process is now fully automated!**
 
 ```bash
-# Prepare a new release
+# Create and publish a new release
 make release VERSION=1.0.0
-
-# Follow the printed instructions to:
-# 1. Push changes and tag
-# 2. Publish to NPM
-# 3. Publish Docker image (automated)
-# 4. Register on Packagist (one-time)
 ```
 
-### Manual Release
+That's it! This single command will:
+1. ✅ Update version in `package.json` and `composer.json`
+2. ✅ Update `CHANGELOG.md`
+3. ✅ Create git commit and tag
+4. ✅ Push to GitHub
+
+GitHub Actions will then automatically:
+5. ✅ Run CI checks (lint, test, type check)
+6. ✅ Create GitHub Release with notes
+7. ✅ Publish to NPM
+8. ✅ Build and push Docker images
+9. ✅ Trigger Packagist auto-update
+
+**Important:** If CI checks fail, the release will not be published. You can delete the tag and fix issues if needed.
+
+### Dry Run
+
+Preview what would happen without making changes:
 
 ```bash
-# Run release script
-./scripts/release.sh 1.0.0
-
-# Or dry-run to preview
+make release VERSION=1.0.0  # (then choose dry-run)
+# Or use the script directly
 ./scripts/release.sh 1.0.0 --dry-run
 ```
 
@@ -78,20 +87,19 @@ make release VERSION=1.0.0
 
 ### 1. TypeScript Package (NPM)
 
-#### Option A: Automated via GitHub Actions
+**Fully automated via GitHub Actions** - triggered by tag push.
 
-1. Create and push a git tag:
-   ```bash
-   git tag -a v1.0.0 -m "Release v1.0.0"
-   git push origin v1.0.0
-   ```
+The release workflow (`.github/workflows/release-automation.yml`) will:
+1. Wait for CI checks to pass
+2. Create GitHub Release
+3. Trigger NPM publishing (`.github/workflows/npm-publish.yml`)
+4. Publish to NPM with provenance
 
-2. GitHub Actions will automatically:
-   - Run tests
-   - Type check
-   - Publish to NPM with provenance
+**No manual steps required!** Just run `make release VERSION=x.y.z`.
 
-#### Option B: Manual Publishing
+#### Manual Publishing (Emergency Only)
+
+Only use this if GitHub Actions is unavailable:
 
 ```bash
 cd packages/cadabra
@@ -115,22 +123,19 @@ npm install cadabra
 
 ### 2. Docker Container
 
-Docker images are **automatically published** to GitHub Container Registry when you push a tag.
+**Fully automated via GitHub Actions** - triggered ONLY by tag push.
 
-#### Automated Publishing (Recommended)
+Docker workflow (`.github/workflows/docker.yml`) triggers **only on version tags** (not on every commit):
+- Builds multi-platform images (amd64, arm64)
+- Runs CI quality checks first
+- Pushes to ghcr.io/sebastiaanwouters/cadabra
+- Tags with version, major, minor, and latest
 
-```bash
-# Create and push tag
-git tag -a v1.0.0 -m "Release v1.0.0"
-git push origin v1.0.0
+**No manual steps required!** Just run `make release VERSION=x.y.z`.
 
-# GitHub Actions will:
-# - Build multi-platform images (amd64, arm64)
-# - Push to ghcr.io/sebastiaanwouters/cadabra
-# - Tag with version, major, minor, and latest
-```
+#### Manual Publishing (Emergency Only)
 
-#### Manual Publishing
+Only use this if GitHub Actions is unavailable:
 
 ```bash
 cd packages/cadabra

@@ -1,0 +1,88 @@
+name: Release Automation
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  # Wait for CI to pass before creating release
+  wait-for-ci:
+    name: Wait for CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for CI workflow
+        uses: lewagon/wait-on-check-action@v1.3.3
+        with:
+          ref: ${{ github.ref }}
+          check-name: 'all-checks-passed'
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          wait-interval: 10
+
+  # Create GitHub Release after CI passes
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: wait-for-ci
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Extract changelog for this version
+        id: changelog
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+
+          # Extract changelog section for this version
+          awk '/^## \['$VERSION'\]/, /^## \[/ {
+            if (/^## \['$VERSION'\]/) {
+              found=1; next
+            }
+            if (/^## \[/ && found) {
+              exit
+            }
+            if (found) print
+          }' CHANGELOG.md > /tmp/release-notes.md
+
+          # If empty, use default message
+          if [ ! -s /tmp/release-notes.md ]; then
+            echo "Release version $VERSION" > /tmp/release-notes.md
+            echo "" >> /tmp/release-notes.md
+            echo "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for details." >> /tmp/release-notes.md
+          fi
+
+          cat /tmp/release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Release ${{ steps.version.outputs.version }}
+          body_path: /tmp/release-notes.md
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "✅ GitHub Release created: ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "This will trigger:" >> $GITHUB_STEP_SUMMARY
+          echo "- NPM publishing (npm-publish.yml)" >> $GITHUB_STEP_SUMMARY
+          echo "- Docker image publishing (docker.yml)" >> $GITHUB_STEP_SUMMARY
+          echo "- Packagist auto-update (webhook)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View release: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY

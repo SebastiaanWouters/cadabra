@@ -62,12 +62,7 @@
     "tsc": "tsc --noEmit",
     "test": "bun test",
     "start": "bun run server.ts",
-    "dev": "bun --hot run server.ts",
-    "docker:build": "docker build -t cadabra-server .",
-    "docker:run": "docker run -p 6942:6942 --rm cadabra-server",
-    "docker:up": "docker compose up -d",
-    "docker:down": "docker compose down",
-    "docker:logs": "docker compose logs -f"
+    "dev": "bun --hot run server.ts"
   },
   "publishConfig": {
     "access": "public"
