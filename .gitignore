@@ -43,6 +43,9 @@ report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
 *.swo
 *~
 
+# Claude Code
+.claude/
+
 # OS Files
 .DS_Store
 Thumbs.db
