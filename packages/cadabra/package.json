@@ -1,6 +1,6 @@
 {
   "name": "cadabra",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Intelligent query cache with automatic invalidation - SQL parser, cache key generation, and invalidation analysis",
   "type": "module",
   "module": "index.ts",
