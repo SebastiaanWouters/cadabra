@@ -45,7 +45,9 @@ abstract class BaseTestCase extends KernelTestCase
         $metadatas = $this->entityManager->getMetadataFactory()->getAllMetadata();
         $schemaTool = new SchemaTool($this->entityManager);
 
-        $schemaTool->dropDatabase();
+        // Use dropSchema() instead of dropDatabase() for SQLite compatibility
+        // dropDatabase() deletes the entire file, dropSchema() just drops tables
+        $schemaTool->dropSchema($metadatas);
         $schemaTool->createSchema($metadatas);
     }
 
