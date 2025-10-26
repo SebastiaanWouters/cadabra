@@ -184,16 +184,16 @@ class CadabraStatement implements Statement
     /**
      * {@inheritdoc}
      */
-    public function bindValue(string|int $param, mixed $value, ParameterType $type): void
+    public function bindValue($param, $value, $type = ParameterType::STRING)
     {
-        $this->wrappedStatement->bindValue($param, $value, $type);
+        return $this->wrappedStatement->bindValue($param, $value, $type);
     }
 
     /**
      * {@inheritdoc}
      */
-    public function bindParam(string|int $param, mixed &$variable, ParameterType $type, int $length = null): void
+    public function bindParam($param, &$variable, $type = ParameterType::STRING, $length = null)
     {
-        $this->wrappedStatement->bindParam($param, $variable, $type, $length);
+        return $this->wrappedStatement->bindParam($param, $variable, $type, $length);
     }
 }
