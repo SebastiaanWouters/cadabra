@@ -40,7 +40,7 @@ Complete Docker publishing workflow with automated multi-platform builds:
 - `packages/cadabra/Dockerfile` - Already optimized (no changes needed)
 - `packages/cadabra/docker-compose.yml` - Already configured
 
-**Registry:** `ghcr.io/yourusername/cadali/cadabra`
+**Registry:** `ghcr.io/sebastiaanwouters/cadabra/cadabra`
 
 ---
 
@@ -220,7 +220,7 @@ git push origin v1.0.0
 ### 3. Automated Publishing
 
 GitHub Actions will automatically:
-- ✅ Build and publish Docker image to `ghcr.io/yourusername/cadali/cadabra:1.0.0`
+- ✅ Build and publish Docker image to `ghcr.io/sebastiaanwouters/cadabra/cadabra:1.0.0`
 - ✅ Run all tests
 - ✅ Create multi-platform images (amd64, arm64)
 

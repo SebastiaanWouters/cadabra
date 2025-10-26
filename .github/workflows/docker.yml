@@ -13,7 +13,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}/cadabra
+  IMAGE_NAME: sebastiaanwouters/cadabra/cadabra
 
 jobs:
   # Run CI checks first
@@ -48,6 +48,8 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=auto
           tags: |
             type=ref,event=branch
             type=ref,event=pr

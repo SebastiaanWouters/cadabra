@@ -126,7 +126,7 @@ git push origin v1.0.0
 
 # GitHub Actions will:
 # - Build multi-platform images (amd64, arm64)
-# - Push to ghcr.io/yourusername/cadali/cadabra
+# - Push to ghcr.io/sebastiaanwouters/cadabra/cadabra
 # - Tag with version, major, minor, and latest
 ```
 
@@ -136,32 +136,32 @@ git push origin v1.0.0
 cd packages/cadabra
 
 # Build image
-docker build -t ghcr.io/yourusername/cadali/cadabra:1.0.0 .
+docker build -t ghcr.io/sebastiaanwouters/cadabra/cadabra:1.0.0 .
 
 # Login to GitHub Container Registry
 echo $GITHUB_TOKEN | docker login ghcr.io -u yourusername --password-stdin
 
 # Push image
-docker push ghcr.io/yourusername/cadali/cadabra:1.0.0
+docker push ghcr.io/sebastiaanwouters/cadabra/cadabra:1.0.0
 
 # Tag as latest
-docker tag ghcr.io/yourusername/cadali/cadabra:1.0.0 ghcr.io/yourusername/cadali/cadabra:latest
-docker push ghcr.io/yourusername/cadali/cadabra:latest
+docker tag ghcr.io/sebastiaanwouters/cadabra/cadabra:1.0.0 ghcr.io/sebastiaanwouters/cadabra/cadabra:latest
+docker push ghcr.io/sebastiaanwouters/cadabra/cadabra:latest
 ```
 
 #### Using Published Docker Image
 
 ```bash
 # Pull image
-docker pull ghcr.io/yourusername/cadali/cadabra:1.0.0
+docker pull ghcr.io/sebastiaanwouters/cadabra/cadabra:1.0.0
 
 # Run container
-docker run -p 6942:6942 ghcr.io/yourusername/cadali/cadabra:1.0.0
+docker run -p 6942:6942 ghcr.io/sebastiaanwouters/cadabra/cadabra:1.0.0
 
 # Or use in docker-compose
 services:
   cadabra:
-    image: ghcr.io/yourusername/cadali/cadabra:1.0.0
+    image: ghcr.io/sebastiaanwouters/cadabra/cadabra:1.0.0
     ports:
       - "6942:6942"
 ```

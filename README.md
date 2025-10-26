@@ -217,7 +217,7 @@ make release VERSION=1.0.0
 ### Distribution Channels
 
 - **NPM Package**: `cadabra` - TypeScript library for Node.js/Bun
-- **Docker Container**: `ghcr.io/yourusername/cadali/cadabra` - Containerized server
+- **Docker Container**: `ghcr.io/sebastiaanwouters/cadabra/cadabra` - Containerized server
 - **Packagist**: `cadabra/php` - PHP client and Symfony bundle
 
 ### Automated Publishing
@@ -246,8 +246,8 @@ composer require cadabra/php
 
 **Docker:**
 ```bash
-docker pull ghcr.io/yourusername/cadali/cadabra:latest
-docker run -p 6942:6942 ghcr.io/yourusername/cadali/cadabra
+docker pull ghcr.io/sebastiaanwouters/cadabra/cadabra:latest
+docker run -p 6942:6942 ghcr.io/sebastiaanwouters/cadabra/cadabra
 ```
 
 ## Makefile Commands

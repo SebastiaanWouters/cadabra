@@ -58,8 +58,8 @@ bunx cadabra
 ### Via Docker
 
 ```bash
-docker pull ghcr.io/yourusername/cadali/cadabra:latest
-docker run -p 6942:6942 ghcr.io/yourusername/cadali/cadabra:latest
+docker pull ghcr.io/sebastiaanwouters/cadabra/cadabra:latest
+docker run -p 6942:6942 ghcr.io/sebastiaanwouters/cadabra/cadabra:latest
 ```
 
 ## Runtime Compatibility
