@@ -21,7 +21,8 @@ abstract class BaseTestCase extends KernelTestCase
         $this->entityManager = static::getContainer()->get(EntityManagerInterface::class);
         $this->fixtures = new DataFixtures($this->entityManager);
 
-        if (!self::$schemaCreated) {
+        // Check if schema actually exists instead of relying on static flag
+        if (!$this->schemaExists()) {
             $this->createDatabaseSchema();
             self::$schemaCreated = true;
         }
@@ -35,9 +36,34 @@ abstract class BaseTestCase extends KernelTestCase
             $this->entityManager->rollback();
         }
 
-        $this->entityManager->close();
+        // Don't close EntityManager for in-memory SQLite databases
+        // Closing the connection destroys the entire :memory: database
+        $platform = $this->entityManager->getConnection()->getDatabasePlatform();
+        $params = $this->entityManager->getConnection()->getParams();
+        $isInMemory = isset($params['memory']) && $params['memory'] === true
+            || (isset($params['path']) && $params['path'] === ':memory:')
+            || (isset($params['url']) && str_contains($params['url'], ':memory:'));
+
+        if (!$isInMemory) {
+            $this->entityManager->close();
+        }
 
         parent::tearDown();
+    }
+
+    protected function schemaExists(): bool
+    {
+        try {
+            $connection = $this->entityManager->getConnection();
+            $schemaManager = $connection->createSchemaManager();
+            $tables = $schemaManager->listTableNames();
+
+            // Check if at least one of our entity tables exists
+            // Using 'users' as a marker table since it's fundamental
+            return in_array('users', $tables, true);
+        } catch (\Exception $e) {
+            return false;
+        }
     }
 
     protected function createDatabaseSchema(): void
