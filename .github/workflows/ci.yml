@@ -52,6 +52,10 @@ jobs:
       - name: Run core tests
         run: bun run test:cadabra
 
+      - name: Setup integration test database
+        working-directory: packages/integration-tests
+        run: bun run setup
+
       - name: Run integration tests
         run: bun run test:integration
 
@@ -127,8 +131,17 @@ jobs:
           # Wait for server to be ready
           timeout 30 bash -c 'until curl -f http://localhost:6942/health; do sleep 1; done' || exit 1
 
+      - name: Setup Symfony test environment
+        working-directory: packages/cadabra-php/symfony-test-app
+        run: |
+          cp .env.test .env
+          mkdir -p var
+
       - name: Install Symfony test app dependencies
         working-directory: packages/cadabra-php/symfony-test-app
+        env:
+          SYMFONY_REQUIRE: ${{ matrix.symfony }}.*
+          APP_ENV: test
         run: composer install --prefer-dist --no-progress --no-interaction
 
       - name: Run Symfony integration tests
