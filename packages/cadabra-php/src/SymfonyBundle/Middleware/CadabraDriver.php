@@ -11,7 +11,6 @@ use Doctrine\DBAL\Driver\API\ExceptionConverter;
 use Doctrine\DBAL\Driver\Connection;
 use Doctrine\DBAL\Platforms\AbstractPlatform;
 use Doctrine\DBAL\Schema\AbstractSchemaManager;
-use Doctrine\DBAL\ServerVersionProvider;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 
@@ -64,9 +63,9 @@ class CadabraDriver implements Driver
     /**
      * {@inheritdoc}
      */
-    public function getDatabasePlatform(ServerVersionProvider $versionProvider): AbstractPlatform
+    public function getDatabasePlatform(): AbstractPlatform
     {
-        return $this->wrappedDriver->getDatabasePlatform($versionProvider);
+        return $this->wrappedDriver->getDatabasePlatform();
     }
 
     /**
