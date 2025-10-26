@@ -147,7 +147,7 @@ jobs:
       - name: Create database schema
         working-directory: packages/cadabra-php/symfony-test-app
         run: |
-          php bin/console doctrine:database:create --if-not-exists --env=test
+          # SQLite creates the database file automatically, just create schema
           php bin/console doctrine:schema:create --env=test
           php bin/console doctrine:fixtures:load --no-interaction --env=test
 
