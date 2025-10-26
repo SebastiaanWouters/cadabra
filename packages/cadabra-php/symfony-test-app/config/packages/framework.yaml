@@ -1,7 +1,7 @@
 framework:
     secret: '%env(APP_SECRET)%'
     http_method_override: false
-    handle_all_throwables: true
+    # handle_all_throwables: true  # Symfony 7.0+ only
     php_errors:
         log: true
 
