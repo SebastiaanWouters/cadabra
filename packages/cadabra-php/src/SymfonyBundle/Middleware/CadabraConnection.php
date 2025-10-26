@@ -70,9 +70,9 @@ class CadabraConnection implements Connection
     /**
      * {@inheritdoc}
      */
-    public function quote(string $value): string
+    public function quote($value, $type = \Doctrine\DBAL\ParameterType::STRING)
     {
-        return $this->wrappedConnection->quote($value);
+        return $this->wrappedConnection->quote($value, $type);
     }
 
     /**
@@ -86,9 +86,9 @@ class CadabraConnection implements Connection
     /**
      * {@inheritdoc}
      */
-    public function lastInsertId(): string|int
+    public function lastInsertId($name = null)
     {
-        return $this->wrappedConnection->lastInsertId();
+        return $this->wrappedConnection->lastInsertId($name);
     }
 
     /**
