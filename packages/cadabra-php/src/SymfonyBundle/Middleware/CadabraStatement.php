@@ -62,11 +62,13 @@ class CadabraStatement implements Statement
      */
     public function execute($params = null): Result
     {
-        $params = $params ?? [];
+        // IMPORTANT: Keep $params as null if not provided - don't convert to []
+        // If params were bound using bindValue/bindParam, execute(null) uses those
+        // If we convert null to [], it overrides the bound params!
 
         try {
             // Send RAW SQL to server - server does all normalization
-            $analysis = $this->client->analyze($this->sql, $params);
+            $analysis = $this->client->analyze($this->sql, $params ?? []);
 
             // Route based on operation type from server
             return match ($analysis['operation_type'] ?? 'unknown') {
@@ -88,10 +90,10 @@ class CadabraStatement implements Statement
     /**
      * Handle SELECT query - check cache or execute and cache.
      *
-     * @param array<mixed> $params
+     * @param array<mixed>|null $params
      * @param array<mixed> $analysis Analysis from server
      */
-    private function handleRead(array $params, array $analysis): Result
+    private function handleRead($params, array $analysis): Result
     {
         // Apply client-side heuristics: should we cache this query?
         if (!$this->strategy->shouldCache($analysis)) {
@@ -158,9 +160,9 @@ class CadabraStatement implements Statement
     /**
      * Handle write query (INSERT/UPDATE/DELETE) - execute and invalidate cache.
      *
-     * @param array<mixed> $params
+     * @param array<mixed>|null $params
      */
-    private function handleWrite(array $params): Result
+    private function handleWrite($params): Result
     {
         // Execute the write query first
         $result = $this->wrappedStatement->execute($params);
@@ -168,7 +170,7 @@ class CadabraStatement implements Statement
         // Trigger async invalidation (don't wait for it)
         // Server determines which cache keys to invalidate
         try {
-            $this->client->invalidate($this->sql, $params);
+            $this->client->invalidate($this->sql, $params ?? []);
             $this->logger->debug('Invalidation queued', ['sql' => $this->sql]);
         } catch (\Throwable $e) {
             // Log but don't fail the write operation
