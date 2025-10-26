@@ -18,7 +18,7 @@ jobs:
         uses: lewagon/wait-on-check-action@v1.3.3
         with:
           ref: ${{ github.ref }}
-          check-name: 'all-checks-passed'
+          check-name: 'All Quality Checks Passed'
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           wait-interval: 10
 
