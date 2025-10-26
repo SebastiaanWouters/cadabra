@@ -1,0 +1,10 @@
+# Mise configuration for Cadali project
+# Ensures correct versions of runtime dependencies
+
+[tools]
+bun = "1.3"
+"ubi:adwinying/php" = "8.4"
+
+[env]
+# Optional: Set environment-specific variables
+_.file = ".env"

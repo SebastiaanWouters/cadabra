@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  cadabra:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cadabra-server:latest
+    container_name: cadabra-server
+
+    # Port mapping
+    ports:
+      - "${PORT:-6942}:6942"
+
+    # Environment variables
+    environment:
+      - PORT=6942
+      - HOST=0.0.0.0
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - CORS_ENABLED=${CORS_ENABLED:-true}
+
+    # Restart policy
+    restart: unless-stopped
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "bun", "--eval", "await fetch('http://localhost:6942/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+    # Resource limits (optional, adjust based on your needs)
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

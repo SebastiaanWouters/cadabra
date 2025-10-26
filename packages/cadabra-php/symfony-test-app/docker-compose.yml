@@ -1,0 +1,73 @@
+services:
+  # Cadabra cache server
+  cadabra-server:
+    build:
+      context: ../../cadabra
+      dockerfile: Dockerfile
+    container_name: cadabra-server
+    ports:
+      - "6942:6942"
+    environment:
+      - PORT=6942
+      - HOST=0.0.0.0
+      - LOG_LEVEL=info
+      - CORS_ENABLED=true
+    networks:
+      - cadabra-network
+    healthcheck:
+      test: ["CMD", "bun", "--eval", "await fetch('http://localhost:6942/health').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+  # Symfony test application
+  symfony-app:
+    build:
+      context: ..
+      dockerfile: symfony-test-app/Dockerfile
+    container_name: symfony-test-app
+    depends_on:
+      cadabra-server:
+        condition: service_healthy
+    environment:
+      - APP_ENV=test
+      - APP_DEBUG=0
+      - APP_SECRET=docker_test_secret_key
+      - DATABASE_URL=sqlite:///%kernel.project_dir%/var/data.db
+      - CADABRA_SERVER_URL=http://cadabra-server:6942
+      - CADABRA_ENABLED=true
+      - CADABRA_TIMEOUT=5
+    networks:
+      - cadabra-network
+    command: ["sleep", "infinity"]
+    restart: unless-stopped
+
+###> doctrine/doctrine-bundle ###
+  database:
+    image: postgres:${POSTGRES_VERSION:-16}-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+      # You should definitely change the password in production
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-!ChangeMe!}
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+    volumes:
+      - database_data:/var/lib/postgresql/data:rw
+      # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
+      # - ./docker/db/data:/var/lib/postgresql/data:rw
+###< doctrine/doctrine-bundle ###
+
+networks:
+  cadabra-network:
+    driver: bridge
+
+volumes:
+###> doctrine/doctrine-bundle ###
+  database_data:
+###< doctrine/doctrine-bundle ###

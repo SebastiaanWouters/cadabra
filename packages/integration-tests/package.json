@@ -1,0 +1,22 @@
+{
+  "name": "cadabra-integration-tests",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Integration tests and benchmarks for Cadabra SQL cache",
+  "scripts": {
+    "tsc": "tsc --noEmit",
+    "test": "bun test",
+    "benchmark": "bun test benchmark.test.ts",
+    "integration": "bun test integration.test.ts",
+    "setup": "bun run setup.ts",
+    "clean": "rm -f ecommerce.db ecommerce.db-shm ecommerce.db-wal cache.db cache.db-shm cache.db-wal && mkdir -p results",
+    "all": "bun run clean && bun run setup && bun run test"
+  },
+  "dependencies": {
+    "cadabra": "workspace:*",
+    "node-sql-parser": "^5.3.5"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

@@ -1,0 +1,42 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Tests
+*.test.ts
+**/__tests__
+
+# Documentation
+*.md
+!DEPLOYMENT.md
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+dist
+build
+*.log
+
+# Environment files (these should be mounted or passed via env vars)
+.env
+.env.*
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore

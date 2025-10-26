@@ -1,0 +1,2 @@
+# This test application doesn't have web routes
+# All interaction happens through console commands and tests

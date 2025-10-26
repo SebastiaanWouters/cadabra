@@ -1,0 +1,33 @@
+# Example Cadabra configuration for Symfony
+cadabra:
+    # URL of the Cadabra service
+    service_url: '%env(CADABRA_SERVICE_URL)%'
+
+    # Cache key prefix/namespace (use environment to separate dev/prod)
+    prefix: '%env(APP_ENV)%_myapp'
+
+    # Auto-caching configuration
+    auto_cache:
+        enabled: true
+        default_ttl: 3600  # 1 hour
+
+        heuristics:
+            # Cache simple queries (recommended for most apps)
+            cache_primary_key_lookups: true    # $repo->find(10)
+            cache_simple_where: true           # WHERE status = ?
+            max_join_tables: 2                 # Skip complex joins
+
+            # Don't cache volatile queries
+            exclude_keywords:
+                - 'FOR UPDATE'
+                - 'LOCK IN SHARE MODE'
+
+            exclude_tables:
+                - sessions
+                - messenger_messages
+
+    # Per-table TTL overrides
+    table_ttls:
+        users: 3600      # 1 hour
+        products: 7200   # 2 hours
+        posts: 1800      # 30 minutes

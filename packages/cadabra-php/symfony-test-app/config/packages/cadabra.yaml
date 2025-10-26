@@ -1,0 +1,14 @@
+cadabra:
+    service_url: '%env(CADABRA_SERVER_URL)%'
+    auto_cache:
+        enabled: '%env(bool:CADABRA_ENABLED)%'
+        default_ttl: 300
+        heuristics:
+            cache_primary_key_lookups: true
+            cache_simple_where: true
+            max_join_tables: 3
+            exclude_keywords: []
+            exclude_tables: []
+    prefix: 'test'
+    table_ttls:
+        default: 300

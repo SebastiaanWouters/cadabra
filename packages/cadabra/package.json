@@ -1,0 +1,75 @@
+{
+  "name": "cadabra",
+  "version": "0.1.0",
+  "description": "Intelligent query cache with automatic invalidation - SQL parser, cache key generation, and invalidation analysis",
+  "type": "module",
+  "module": "index.ts",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": {
+      "import": "./index.ts",
+      "types": "./index.ts"
+    },
+    "./server": {
+      "import": "./server.ts",
+      "types": "./server.ts"
+    }
+  },
+  "bin": {
+    "cadabra": "./bin/cadabra.js"
+  },
+  "files": [
+    "bin/",
+    "cadabra.ts",
+    "index.ts",
+    "server.ts",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "cache",
+    "query-cache",
+    "sql",
+    "database",
+    "invalidation",
+    "sql-parser",
+    "bun",
+    "typescript"
+  ],
+  "author": "Cadabra Contributors",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/cadali.git",
+    "directory": "packages/cadabra"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/cadali/issues"
+  },
+  "homepage": "https://github.com/yourusername/cadali/tree/main/packages/cadabra#readme",
+  "engines": {
+    "node": ">=18.0.0",
+    "bun": ">=1.0.0"
+  },
+  "dependencies": {
+    "node-sql-parser": "^5.3.13"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "scripts": {
+    "tsc": "tsc --noEmit",
+    "test": "bun test",
+    "start": "bun run server.ts",
+    "dev": "bun --hot run server.ts",
+    "docker:build": "docker build -t cadabra-server .",
+    "docker:run": "docker run -p 6942:6942 --rm cadabra-server",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

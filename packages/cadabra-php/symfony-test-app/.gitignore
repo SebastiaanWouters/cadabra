@@ -1,0 +1,39 @@
+###> symfony/framework-bundle ###
+/.env.local
+/.env.local.php
+/.env.*.local
+/config/secrets/prod/prod.decrypt.private.php
+/public/bundles/
+/var/
+/vendor/
+###< symfony/framework-bundle ###
+
+###> phpunit/phpunit ###
+/phpunit.xml
+.phpunit.result.cache
+###< phpunit/phpunit ###
+
+###> Composer ###
+composer.lock
+composer.phar
+###< Composer ###
+
+###> IDE ###
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+###< IDE ###
+
+###> OS ###
+.DS_Store
+Thumbs.db
+###< OS ###
+
+###> Database ###
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+###< Database ###

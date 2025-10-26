@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//home/sebas/Work/cadali/packages/cadabra-php/**)",
+      "Read(//home/sebas/Work/cadali/**)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
