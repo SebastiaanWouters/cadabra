@@ -144,13 +144,6 @@ jobs:
           APP_ENV: test
         run: composer install --prefer-dist --no-progress --no-interaction
 
-      - name: Create database schema
-        working-directory: packages/cadabra-php/symfony-test-app
-        run: |
-          # SQLite creates the database file automatically, just create schema
-          # Tests create their own data in setUp() methods, no fixtures needed
-          php bin/console doctrine:schema:create --env=test
-
       - name: Run Symfony integration tests
         working-directory: packages/cadabra-php/symfony-test-app
         run: vendor/bin/phpunit --colors=always
