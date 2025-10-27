@@ -8,8 +8,8 @@ help:
 	@echo ""
 	@echo "Targets:"
 	@echo "  install          Install dependencies"
-	@echo "  test             Run all tests (core + integration)"
-	@echo "  test-cadabra     Run core library tests only"
+	@echo "  test             Run all tests (unit + integration)"
+	@echo "  test-unit        Run unit tests only"
 	@echo "  test-integration Run integration tests only"
 	@echo "  bench            Run performance benchmarks"
 	@echo "  check            Run code style checks"
@@ -32,8 +32,8 @@ install:
 test:
 	bun run test
 
-# Run core library tests
-test-cadabra:
+# Run unit tests
+test-unit:
 	bun run test:cadabra
 
 # Run integration tests
