@@ -96,7 +96,7 @@ async function benchmark(
   }
   const cachedTime = performance.now() - cachedStart;
 
-  const _metrics = cachedApp.getMetrics();
+  const cacheStats = cachedApp.getCacheStats();
   cachedApp.close();
 
   const result: BenchmarkResult = {
@@ -104,6 +104,7 @@ async function benchmark(
     withoutCache: uncachedTime,
     withCache: cachedTime,
     speedup: uncachedTime / cachedTime,
+    cacheHitRate: cacheStats.hitRate,
   };
 
   printResults(result);
@@ -136,9 +137,9 @@ beforeAll(() => {
 });
 
 describe("Performance Benchmarks", () => {
-  test("Scenario 1: Simple row lookup (baseline)", async () => {
+  test("Scenario 1: Simple row lookup (random IDs, cache misses)", async () => {
     await benchmark(
-      "Simple Row Lookup (getUserById)",
+      "Simple Row Lookup - Random IDs (0% cache hits)",
       () => {},
       (app) => {
         app.getUserById(Math.floor(Math.random() * 10_000) + 1);
@@ -146,9 +147,19 @@ describe("Performance Benchmarks", () => {
     );
   });
 
-  test("Scenario 2: 2-table JOIN with ORDER BY", async () => {
+  test("Scenario 1b: Simple row lookup (same ID, cache hits)", async () => {
     await benchmark(
-      "User Orders (2-table JOIN + ORDER BY + LIMIT)",
+      "Simple Row Lookup - Same ID (100% cache hits)",
+      () => {},
+      (app) => {
+        app.getUserById(42); // Always query the same ID
+      }
+    );
+  });
+
+  test("Scenario 2: 2-table JOIN with ORDER BY (random IDs)", async () => {
+    await benchmark(
+      "User Orders - Random IDs (0% cache hits)",
       () => {},
       (app) => {
         app.getUserOrders(Math.floor(Math.random() * 10_000) + 1);
@@ -156,7 +167,17 @@ describe("Performance Benchmarks", () => {
     );
   });
 
-  test("Scenario 3: 4-table complex JOIN", async () => {
+  test("Scenario 2b: 2-table JOIN with ORDER BY (same ID, cache hits)", async () => {
+    await benchmark(
+      "User Orders - Same ID (100% cache hits)",
+      () => {},
+      (app) => {
+        app.getUserOrders(100); // Always query the same user
+      }
+    );
+  });
+
+  test("Scenario 3: 4-table complex JOIN (random IDs)", async () => {
     await benchmark(
       "Order Details (4-table JOIN with product info)",
       () => {},
@@ -312,6 +333,226 @@ describe("Performance Benchmarks", () => {
 
     printResults(result);
     results.push(result);
+  });
+
+  test("Scenario 13: Batch invalidation performance", async () => {
+    printBenchmarkHeader("Batch Invalidation Performance (100 entries)");
+
+    const cachedApp = new ECommerceApp("ecommerce.db", true);
+
+    // Register 100 different queries for the same table
+    console.log("Registering 100 cache entries...");
+    for (let i = 1; i <= 100; i++) {
+      cachedApp.getUserById(i);
+    }
+
+    console.log("Warming up invalidation...");
+    // Warmup: invalidate and re-cache
+    for (let i = 0; i < WARMUP_RUNS; i++) {
+      cachedApp.write("UPDATE users SET name = 'Test' WHERE id = 1", []);
+      cachedApp.getUserById(1);
+    }
+
+    // Register 100 entries again
+    for (let i = 1; i <= 100; i++) {
+      cachedApp.getUserById(i);
+    }
+
+    console.log(`Running ${BENCHMARK_RUNS} batch invalidations...`);
+    const start = performance.now();
+    for (let i = 0; i < BENCHMARK_RUNS; i++) {
+      // This should invalidate all cached user queries efficiently
+      cachedApp.write("UPDATE users SET name = 'Batch Update'", []);
+
+      // Re-cache for next iteration
+      for (let j = 1; j <= 100; j++) {
+        cachedApp.getUserById(j);
+      }
+    }
+    const totalTime = performance.now() - start;
+
+    const avgInvalidationTime = totalTime / BENCHMARK_RUNS;
+    console.log(
+      `\nAverage batch invalidation time: ${formatTime(avgInvalidationTime)}`
+    );
+    console.log(`Time per entry: ${formatTime(avgInvalidationTime / 100)}`);
+    console.log(`Total time: ${formatTime(totalTime)}`);
+    console.log("=".repeat(70));
+
+    cachedApp.close();
+
+    results.push({
+      scenario: "Batch Invalidation (100 entries)",
+      withoutCache: 0,
+      withCache: avgInvalidationTime,
+      speedup: 1,
+    });
+  });
+
+  test("Scenario 14: Range-based invalidation precision", async () => {
+    printBenchmarkHeader("Range-Based Invalidation Precision");
+
+    const cachedApp = new ECommerceApp("ecommerce.db", true);
+
+    // Cache queries for different age ranges
+    console.log("Setting up cache with range-based queries...");
+
+    // Query 1: Young users (age < 30)
+    const youngUsersQuery =
+      "SELECT COUNT(*) FROM users WHERE created_at < '2024-01-01'";
+    cachedApp.query(youngUsersQuery);
+
+    // Query 2: Old users (age >= 30)
+    const oldUsersQuery =
+      "SELECT COUNT(*) FROM users WHERE created_at >= '2024-01-01'";
+    cachedApp.query(oldUsersQuery);
+
+    const metricsBefore = cachedApp.getMetrics();
+    console.log(`Cache entries before writes: ${metricsBefore.totalEntries}`);
+
+    let skippedInvalidations = 0;
+    let performedInvalidations = 0;
+
+    console.log(`\nTesting ${BENCHMARK_RUNS} writes with range analysis...`);
+    const start = performance.now();
+
+    for (let i = 0; i < BENCHMARK_RUNS; i++) {
+      // Write that affects ONLY young users (created_at < '2024-01-01')
+      const metricsBeforeWrite = cachedApp.getMetrics();
+      cachedApp.write(
+        "UPDATE users SET name = 'Updated' WHERE created_at < '2023-01-01'",
+        []
+      );
+      const metricsAfterWrite = cachedApp.getMetrics();
+
+      // Check if old users query was invalidated (it shouldn't be)
+      if (metricsBeforeWrite.totalEntries === metricsAfterWrite.totalEntries) {
+        skippedInvalidations++;
+      } else {
+        performedInvalidations++;
+      }
+
+      // Re-cache for next iteration
+      cachedApp.query(youngUsersQuery);
+      cachedApp.query(oldUsersQuery);
+    }
+
+    const totalTime = performance.now() - start;
+
+    console.log(`\nSkipped invalidations (correct): ${skippedInvalidations}`);
+    console.log(`Performed invalidations: ${performedInvalidations}`);
+    console.log(
+      `Precision rate: ${((skippedInvalidations / BENCHMARK_RUNS) * 100).toFixed(1)}%`
+    );
+    console.log(
+      `Average time per write: ${formatTime(totalTime / BENCHMARK_RUNS)}`
+    );
+    console.log("=".repeat(70));
+
+    cachedApp.close();
+
+    results.push({
+      scenario: "Range-Based Invalidation Precision",
+      withoutCache: 0,
+      withCache: totalTime / BENCHMARK_RUNS,
+      speedup: 1,
+    });
+  });
+
+  test("Scenario 16: False invalidation rate comparison", async () => {
+    printBenchmarkHeader("False Invalidation Rate (Precision Test)");
+
+    const cachedApp = new ECommerceApp("ecommerce.db", true);
+
+    // Set up cache with various queries
+    console.log("Setting up diverse query cache...");
+
+    const testQueries = [
+      // Range-based queries
+      { sql: "SELECT * FROM users WHERE id > 1000", params: [] },
+      { sql: "SELECT * FROM users WHERE id <= 1000", params: [] },
+      {
+        sql: "SELECT * FROM products WHERE price BETWEEN 100 AND 500",
+        params: [],
+      },
+      { sql: "SELECT * FROM products WHERE price < 100", params: [] },
+
+      // Column-specific queries
+      { sql: "SELECT name FROM users WHERE id = 500", params: [] },
+      { sql: "SELECT email FROM users WHERE id = 500", params: [] },
+      { sql: "SELECT created_at FROM users WHERE id = 500", params: [] },
+    ];
+
+    // Cache all queries
+    for (const q of testQueries) {
+      cachedApp.query(q.sql, q.params);
+    }
+
+    const initialEntries = cachedApp.getMetrics().totalEntries;
+    console.log(`Initial cache entries: ${initialEntries}`);
+
+    // Test writes that SHOULD NOT invalidate certain queries
+    const testWrites = [
+      // Write 1: Update high IDs (should NOT invalidate id <= 1000)
+      { sql: "UPDATE users SET name = 'Test' WHERE id > 5000", shouldSkip: 1 },
+
+      // Write 2: Update low prices (should NOT invalidate price BETWEEN 100 AND 500)
+      {
+        sql: "UPDATE products SET stock = 100 WHERE price < 50",
+        shouldSkip: 1,
+      },
+
+      // Write 3: Update email (should NOT invalidate name-only or created_at-only queries)
+      {
+        sql: "UPDATE users SET email = 'test@example.com' WHERE id = 500",
+        shouldSkip: 2,
+      },
+    ];
+
+    let totalExpectedSkips = 0;
+    let totalActualSkips = 0;
+
+    console.log("\nTesting invalidation precision...");
+
+    for (const write of testWrites) {
+      // Re-cache queries
+      for (const q of testQueries) {
+        cachedApp.query(q.sql, q.params);
+      }
+
+      const entriesBefore = cachedApp.getMetrics().totalEntries;
+      cachedApp.write(write.sql, []);
+      const entriesAfter = cachedApp.getMetrics().totalEntries;
+
+      const invalidated = entriesBefore - entriesAfter;
+      const expectedToSkip = write.shouldSkip;
+      const actuallySkipped = testQueries.length - invalidated;
+
+      totalExpectedSkips += expectedToSkip;
+      totalActualSkips += actuallySkipped;
+
+      console.log(`\nWrite: ${write.sql.substring(0, 50)}...`);
+      console.log(`  Expected to skip: ${expectedToSkip} queries`);
+      console.log(`  Actually skipped: ${actuallySkipped} queries`);
+      console.log(`  Invalidated: ${invalidated} queries`);
+    }
+
+    const precisionRate = (totalActualSkips / totalExpectedSkips) * 100;
+
+    console.log(`\n${"=".repeat(70)}`);
+    console.log(`Total expected skips: ${totalExpectedSkips}`);
+    console.log(`Total actual skips: ${totalActualSkips}`);
+    console.log(`Precision rate: ${precisionRate.toFixed(1)}%`);
+    console.log(`${"=".repeat(70)}`);
+
+    cachedApp.close();
+
+    results.push({
+      scenario: "False Invalidation Rate",
+      withoutCache: 0,
+      withCache: precisionRate,
+      speedup: 1,
+    });
   });
 
   test("Summary: Print all benchmark results", () => {

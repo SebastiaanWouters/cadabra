@@ -67,6 +67,7 @@ type InvalidationInfo = {
   operation: "INSERT" | "UPDATE" | "DELETE";
   affectedRows?: string[];
   modifiedColumns?: string[];
+  conditions?: Condition[];
 };
 
 // ============================================
@@ -1098,11 +1099,15 @@ function analyzeWrite(
   const modifiedColumns =
     operation === "UPDATE" ? extractModifiedColumns(astNode) : undefined;
 
+  // 7. Extract WHERE conditions for range analysis
+  const conditions = extractConditions(astNode);
+
   return {
     table,
     operation,
     affectedRows,
     modifiedColumns,
+    conditions,
   };
 }
 
@@ -1210,6 +1215,210 @@ function affectsJoinConditions(
 }
 
 /**
+ * Checks if two range conditions can overlap
+ * Returns true if they might overlap, false if provably non-overlapping
+ */
+function rangesOverlap(cond1: Condition, cond2: Condition): boolean {
+  // Same column required
+  if (cond1.column !== cond2.column) {
+    return true; // Different columns, can't analyze
+  }
+
+  // Handle numeric range comparisons
+  const isNumeric = (val: unknown): boolean =>
+    typeof val === "number" ||
+    (typeof val === "string" && !Number.isNaN(Number(val)));
+
+  // Extract numeric values
+  const getNumValue = (val: unknown): number | null => {
+    if (typeof val === "number") {
+      return val;
+    }
+    if (typeof val === "string") {
+      const num = Number(val);
+      return Number.isNaN(num) ? null : num;
+    }
+    // Handle AST nodes with {type: "number", value: X}
+    if (typeof val === "object" && val !== null && "value" in val) {
+      const objVal = val as Record<string, unknown>;
+      if (typeof objVal.value === "number") {
+        return objVal.value;
+      }
+      if (typeof objVal.value === "string") {
+        const num = Number(objVal.value);
+        return Number.isNaN(num) ? null : num;
+      }
+    }
+    return null;
+  };
+
+  // Condition 1 range
+  let c1Min: number | null = null;
+  let c1Max: number | null = null;
+  let c1MinInclusive = true;
+  let c1MaxInclusive = true;
+
+  // Condition 2 range
+  let c2Min: number | null = null;
+  let c2Max: number | null = null;
+  let c2MinInclusive = true;
+  let c2MaxInclusive = true;
+
+  // Extract ranges from condition 1
+  if (cond1.operator === "=" && isNumeric(cond1.value)) {
+    const val = getNumValue(cond1.value);
+    c1Min = val;
+    c1Max = val;
+  } else if (cond1.operator === ">" && isNumeric(cond1.value)) {
+    c1Min = getNumValue(cond1.value);
+    c1MinInclusive = false;
+  } else if (cond1.operator === ">=" && isNumeric(cond1.value)) {
+    c1Min = getNumValue(cond1.value);
+  } else if (cond1.operator === "<" && isNumeric(cond1.value)) {
+    c1Max = getNumValue(cond1.value);
+    c1MaxInclusive = false;
+  } else if (cond1.operator === "<=" && isNumeric(cond1.value)) {
+    c1Max = getNumValue(cond1.value);
+  } else if (
+    cond1.operator === "BETWEEN" &&
+    Array.isArray(cond1.value) &&
+    cond1.value.length === 2
+  ) {
+    c1Min = getNumValue(cond1.value[0]);
+    c1Max = getNumValue(cond1.value[1]);
+  } else if (cond1.operator === "IN" && Array.isArray(cond1.value)) {
+    // For IN, get min and max of the set
+    const numValues = cond1.value
+      .map(getNumValue)
+      .filter((v): v is number => v !== null);
+    if (numValues.length > 0) {
+      c1Min = Math.min(...numValues);
+      c1Max = Math.max(...numValues);
+    }
+  }
+
+  // Extract ranges from condition 2
+  if (cond2.operator === "=" && isNumeric(cond2.value)) {
+    const val = getNumValue(cond2.value);
+    c2Min = val;
+    c2Max = val;
+  } else if (cond2.operator === ">" && isNumeric(cond2.value)) {
+    c2Min = getNumValue(cond2.value);
+    c2MinInclusive = false;
+  } else if (cond2.operator === ">=" && isNumeric(cond2.value)) {
+    c2Min = getNumValue(cond2.value);
+  } else if (cond2.operator === "<" && isNumeric(cond2.value)) {
+    c2Max = getNumValue(cond2.value);
+    c2MaxInclusive = false;
+  } else if (cond2.operator === "<=" && isNumeric(cond2.value)) {
+    c2Max = getNumValue(cond2.value);
+  } else if (
+    cond2.operator === "BETWEEN" &&
+    Array.isArray(cond2.value) &&
+    cond2.value.length === 2
+  ) {
+    c2Min = getNumValue(cond2.value[0]);
+    c2Max = getNumValue(cond2.value[1]);
+  } else if (cond2.operator === "IN" && Array.isArray(cond2.value)) {
+    // For IN, get min and max of the set
+    const numValues = cond2.value
+      .map(getNumValue)
+      .filter((v): v is number => v !== null);
+    if (numValues.length > 0) {
+      c2Min = Math.min(...numValues);
+      c2Max = Math.max(...numValues);
+    }
+  }
+
+  // If we couldn't extract numeric ranges, assume overlap (conservative)
+  if (c1Min === null && c1Max === null && c2Min === null && c2Max === null) {
+    return true;
+  }
+
+  // Check for non-overlapping ranges
+  // Range 1: [c1Min, c1Max], Range 2: [c2Min, c2Max]
+
+  // Case 1: Range 1 is entirely less than Range 2
+  if (c1Max !== null && c2Min !== null) {
+    if (c1Max < c2Min) {
+      return false; // No overlap
+    }
+    if (c1Max === c2Min && !(c1MaxInclusive && c2MinInclusive)) {
+      return false; // Touching but not overlapping
+    }
+  }
+
+  // Case 2: Range 1 is entirely greater than Range 2
+  if (c1Min !== null && c2Max !== null) {
+    if (c1Min > c2Max) {
+      return false; // No overlap
+    }
+    if (c1Min === c2Max && !(c1MinInclusive && c2MaxInclusive)) {
+      return false; // Touching but not overlapping
+    }
+  }
+
+  // If we reach here, ranges might overlap
+  return true;
+}
+
+/**
+ * Checks if two condition sets can overlap
+ * Returns false only if we can PROVE they don't overlap
+ */
+function conditionsOverlap(
+  cacheConditions: Condition[],
+  writeConditions: Condition[]
+): boolean {
+  // Group conditions by column for both sets
+  const cacheByColumn = new Map<string, Condition[]>();
+  for (const cond of cacheConditions) {
+    const existing = cacheByColumn.get(cond.column) || [];
+    existing.push(cond);
+    cacheByColumn.set(cond.column, existing);
+  }
+
+  const writeByColumn = new Map<string, Condition[]>();
+  for (const cond of writeConditions) {
+    const existing = writeByColumn.get(cond.column) || [];
+    existing.push(cond);
+    writeByColumn.set(cond.column, existing);
+  }
+
+  // For each column that appears in BOTH cache and write conditions
+  for (const [column, cacheConds] of cacheByColumn) {
+    const writeConds = writeByColumn.get(column);
+    if (!writeConds || writeConds.length === 0) {
+      continue; // No write condition on this column, skip
+    }
+
+    // Check if ANY cache condition overlaps with ANY write condition
+    // We need at least ONE overlap for the query to potentially be affected
+    let hasOverlap = false;
+
+    for (const cacheCond of cacheConds) {
+      for (const writeCond of writeConds) {
+        if (rangesOverlap(cacheCond, writeCond)) {
+          hasOverlap = true;
+          break;
+        }
+      }
+      if (hasOverlap) {
+        break;
+      }
+    }
+
+    // If this column has NO overlap, the condition sets don't overlap
+    if (!hasOverlap) {
+      return false;
+    }
+  }
+
+  // Conservative: assume overlap if we can't prove otherwise
+  return true;
+}
+
+/**
  * Decides if write operation should invalidate cached query
  */
 function shouldInvalidate(
@@ -1224,30 +1433,70 @@ function shouldInvalidate(
     return false;
   }
 
-  // 2. INSERT always invalidates (new rows affect JOINs and aggregates)
+  // 2. For INSERT operations, check if new row would match cached query's WHERE clause
   if (writeInfo.operation === "INSERT") {
+    // For aggregate queries or queries without specific WHERE conditions, always invalidate
+    if (
+      cacheKey.classification === "aggregate" ||
+      cacheKey.classification === "join" ||
+      !affectedTable.conditions ||
+      affectedTable.conditions.length === 0
+    ) {
+      return true;
+    }
+
+    // For queries with WHERE clauses, we'd need the inserted values to determine if they match
+    // Since we don't have that information in the current writeInfo, conservatively invalidate
+    // TODO: Extract inserted values from INSERT query for more precise filtering
     return true;
   }
 
-  // 3. DELETE always invalidates (removed rows affect JOINs and aggregates)
+  // 3. For DELETE operations, check if deleted rows could affect cached query
   if (writeInfo.operation === "DELETE") {
+    // For aggregate queries or joins, always invalidate
+    if (
+      cacheKey.classification === "aggregate" ||
+      cacheKey.classification === "join"
+    ) {
+      return true;
+    }
+
+    // Check if WHERE conditions overlap
+    if (
+      writeInfo.conditions &&
+      affectedTable.conditions &&
+      affectedTable.conditions.length > 0
+    ) {
+      // Use range analysis to determine if DELETE affects cached query
+      const overlap = conditionsOverlap(
+        affectedTable.conditions,
+        writeInfo.conditions
+      );
+      if (!overlap) {
+        return false; // Provably non-overlapping ranges, no invalidation needed
+      }
+    }
+
+    if (writeInfo.affectedRows && affectedTable.conditions) {
+      // Check if any affected row is in the cached query's result set
+      return rowsOverlap(cacheKey, writeInfo.affectedRows);
+    }
+
+    // Can't determine, invalidate conservatively
     return true;
   }
 
   // 4. For UPDATE operations, analyze what's affected
-  const hasRowOverlap = writeInfo.affectedRows
-    ? rowsOverlap(cacheKey, writeInfo.affectedRows)
-    : true; // Can't determine rows, assume overlap
 
-  // 5. Check column overlap (UPDATE only)
+  // First check column overlap
   if (writeInfo.modifiedColumns) {
-    // 5a. Check if modified columns are in the SELECT list
+    // 4a. Check if modified columns are in the SELECT list
     const hasColumnOverlap = columnsOverlap(
       affectedTable.columns,
       writeInfo.modifiedColumns
     );
 
-    // 5b. For JOIN queries, also check if modified columns affect JOIN conditions
+    // 4b. For JOIN queries, also check if modified columns affect JOIN conditions
     const hasJoinOverlap =
       cacheKey.classification === "join" &&
       affectsJoinConditions(
@@ -1256,28 +1505,77 @@ function shouldInvalidate(
         writeInfo.modifiedColumns
       );
 
+    // If no column overlap and no join overlap, no need to invalidate
+    if (!(hasColumnOverlap || hasJoinOverlap)) {
+      return false;
+    }
+
+    // Check WHERE condition overlap using range analysis
+    if (
+      writeInfo.conditions &&
+      writeInfo.conditions.length > 0 &&
+      affectedTable.conditions &&
+      affectedTable.conditions.length > 0
+    ) {
+      const overlap = conditionsOverlap(
+        affectedTable.conditions,
+        writeInfo.conditions
+      );
+      if (!overlap) {
+        return false; // Provably non-overlapping ranges, no invalidation needed
+      }
+    }
+
     // For JOIN queries: invalidate if JOIN conditions OR selected columns are affected
     // We can't reliably determine row overlap across tables, so be conservative
     if (
       cacheKey.classification === "join" &&
       (hasJoinOverlap || hasColumnOverlap)
     ) {
+      // Even for JOINs, check if we can determine row non-overlap
+      if (writeInfo.affectedRows && affectedTable.conditions) {
+        const hasRowOverlap = rowsOverlap(cacheKey, writeInfo.affectedRows);
+        if (!hasRowOverlap) {
+          return false; // Different rows, no invalidation needed
+        }
+      }
       return true;
     }
 
-    // For single-table queries: both rows and columns must overlap
-    if (hasRowOverlap && hasColumnOverlap) {
+    // For single-table queries with column overlap, check row overlap
+    if (hasColumnOverlap) {
+      if (writeInfo.affectedRows && affectedTable.conditions) {
+        return rowsOverlap(cacheKey, writeInfo.affectedRows);
+      }
+      // Can't determine row overlap, invalidate conservatively
       return true;
     }
 
-    // No overlap
+    // No column or join overlap
     return false;
   }
 
-  // 6. No column information - use row overlap or invalidate conservatively
-  if (!hasRowOverlap) {
-    return false;
+  // 5. No column information - check WHERE condition and row overlap
+  if (
+    writeInfo.conditions &&
+    writeInfo.conditions.length > 0 &&
+    affectedTable.conditions &&
+    affectedTable.conditions.length > 0
+  ) {
+    const overlap = conditionsOverlap(
+      affectedTable.conditions,
+      writeInfo.conditions
+    );
+    if (!overlap) {
+      return false; // Provably non-overlapping ranges
+    }
   }
+
+  if (writeInfo.affectedRows && affectedTable.conditions) {
+    return rowsOverlap(cacheKey, writeInfo.affectedRows);
+  }
+
+  // Can't determine, invalidate conservatively
   return true;
 }
 
@@ -1312,7 +1610,8 @@ class CacheManager {
       CREATE TABLE IF NOT EXISTS cache_entries (
         fingerprint TEXT PRIMARY KEY,
         result TEXT NOT NULL,
-        cache_key TEXT NOT NULL
+        cache_key TEXT NOT NULL,
+        created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
       )
     `);
 
@@ -1360,7 +1659,7 @@ class CacheManager {
     this.stmts.set(
       "insertCache",
       this.db.prepare(
-        "INSERT OR REPLACE INTO cache_entries (fingerprint, result, cache_key) VALUES (?, ?, ?)"
+        "INSERT OR REPLACE INTO cache_entries (fingerprint, result, cache_key, created_at) VALUES (?, ?, ?, ?)"
       )
     );
     this.stmts.set(
@@ -1448,6 +1747,7 @@ class CacheManager {
   register(fingerprint: string, result: unknown, cacheKey: CacheKey): void {
     const resultJSON = JSON.stringify(result);
     const cacheKeyJSON = JSON.stringify(cacheKey);
+    const now = Math.floor(Date.now() / 1000);
 
     // Begin transaction
     this.db.run("BEGIN");
@@ -1456,7 +1756,7 @@ class CacheManager {
       // Store cache entry with metadata
       const insertStmt = this.stmts.get("insertCache");
       if (insertStmt) {
-        insertStmt.run(fingerprint, resultJSON, cacheKeyJSON);
+        insertStmt.run(fingerprint, resultJSON, cacheKeyJSON, now);
       }
 
       // Add indexes
@@ -1593,39 +1893,30 @@ class CacheManager {
     this.db.run("BEGIN");
 
     try {
-      let deletedCount = 0;
+      // Batch delete all entries at once using IN clause
+      const placeholders = fingerprintsToDelete.map(() => "?").join(",");
 
-      for (const fp of fingerprintsToDelete) {
-        // Delete cache entry and all indexes
-        const deleteStmt = this.stmts.get("deleteCache");
-        if (deleteStmt) {
-          deleteStmt.run(fp);
-        }
+      // Delete from cache_entries
+      const deleteCacheSQL = `DELETE FROM cache_entries WHERE fingerprint IN (${placeholders})`;
+      this.db.run(deleteCacheSQL, fingerprintsToDelete as never[]);
 
-        const deleteTableStmt = this.stmts.get("deleteTableIndex");
-        if (deleteTableStmt) {
-          deleteTableStmt.run(fp);
-        }
+      // Delete from indexes
+      const deleteTableIndexSQL = `DELETE FROM table_index WHERE fingerprint IN (${placeholders})`;
+      this.db.run(deleteTableIndexSQL, fingerprintsToDelete as never[]);
 
-        const deleteRowStmt = this.stmts.get("deleteRowIndex");
-        if (deleteRowStmt) {
-          deleteRowStmt.run(fp);
-        }
+      const deleteRowIndexSQL = `DELETE FROM row_index WHERE fingerprint IN (${placeholders})`;
+      this.db.run(deleteRowIndexSQL, fingerprintsToDelete as never[]);
 
-        const deleteColStmt = this.stmts.get("deleteColumnIndex");
-        if (deleteColStmt) {
-          deleteColStmt.run(fp);
-        }
+      const deleteColIndexSQL = `DELETE FROM column_index WHERE fingerprint IN (${placeholders})`;
+      this.db.run(deleteColIndexSQL, fingerprintsToDelete as never[]);
 
-        const deleteAggStmt = this.stmts.get("deleteAggregateIndex");
-        if (deleteAggStmt) {
-          deleteAggStmt.run(fp);
-        }
+      const deleteAggIndexSQL = `DELETE FROM aggregate_index WHERE fingerprint IN (${placeholders})`;
+      this.db.run(deleteAggIndexSQL, fingerprintsToDelete as never[]);
 
-        deletedCount++;
-      }
+      const deletedCount = fingerprintsToDelete.length;
 
       this.db.run("COMMIT");
+
       return deletedCount;
     } catch (error) {
       this.db.run("ROLLBACK");
@@ -1785,37 +2076,33 @@ class CacheManager {
     }
 
     const rows = stmt.all(tableName) as Array<{ fingerprint: string }>;
-    let cleared = 0;
+    const fingerprints = rows.map((r) => r.fingerprint);
 
-    // Delete each cache entry and its indexes
+    if (fingerprints.length === 0) {
+      return 0;
+    }
+
+    // Delete all entries in batch
     this.db.run("BEGIN");
     try {
-      for (const row of rows) {
-        const deleteStmt = this.stmts.get("deleteCache");
-        if (deleteStmt) {
-          deleteStmt.run(row.fingerprint);
-          cleared++;
-        }
+      const placeholders = fingerprints.map(() => "?").join(",");
 
-        // Delete from all indexes
-        const deleteTableStmt = this.stmts.get("deleteTableIndex");
-        const deleteRowStmt = this.stmts.get("deleteRowIndex");
-        const deleteColStmt = this.stmts.get("deleteColumnIndex");
-        const deleteAggStmt = this.stmts.get("deleteAggregateIndex");
+      // Delete from cache_entries
+      const deleteCacheSQL = `DELETE FROM cache_entries WHERE fingerprint IN (${placeholders})`;
+      this.db.run(deleteCacheSQL, fingerprints as never[]);
 
-        if (deleteTableStmt) {
-          deleteTableStmt.run(row.fingerprint);
-        }
-        if (deleteRowStmt) {
-          deleteRowStmt.run(row.fingerprint);
-        }
-        if (deleteColStmt) {
-          deleteColStmt.run(row.fingerprint);
-        }
-        if (deleteAggStmt) {
-          deleteAggStmt.run(row.fingerprint);
-        }
-      }
+      // Delete from indexes
+      const deleteTableIndexSQL = `DELETE FROM table_index WHERE fingerprint IN (${placeholders})`;
+      this.db.run(deleteTableIndexSQL, fingerprints as never[]);
+
+      const deleteRowIndexSQL = `DELETE FROM row_index WHERE fingerprint IN (${placeholders})`;
+      this.db.run(deleteRowIndexSQL, fingerprints as never[]);
+
+      const deleteColIndexSQL = `DELETE FROM column_index WHERE fingerprint IN (${placeholders})`;
+      this.db.run(deleteColIndexSQL, fingerprints as never[]);
+
+      const deleteAggIndexSQL = `DELETE FROM aggregate_index WHERE fingerprint IN (${placeholders})`;
+      this.db.run(deleteAggIndexSQL, fingerprints as never[]);
 
       this.db.run("COMMIT");
     } catch (error) {
@@ -1823,7 +2110,7 @@ class CacheManager {
       throw error;
     }
 
-    return cleared;
+    return fingerprints.length;
   }
 
   close(): void {

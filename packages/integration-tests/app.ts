@@ -6,6 +6,8 @@ export class ECommerceApp {
   private readonly _db: Database;
   private readonly _cache: CacheManager;
   private readonly useCache: boolean;
+  private cacheHits = 0;
+  private cacheMisses = 0;
 
   constructor(dbPath = "ecommerce.db", useCache = true) {
     this._db = new Database(dbPath);
@@ -29,8 +31,11 @@ export class ECommerceApp {
     // Check cache
     const cached = this._cache.get(cacheKey.fingerprint);
     if (cached !== null) {
+      this.cacheHits++;
       return cached;
     }
+
+    this.cacheMisses++;
 
     // Execute query
     const result = this._db.query(sql).all(...((params || []) as never[]));
@@ -62,6 +67,27 @@ export class ECommerceApp {
    */
   getMetrics() {
     return this._cache.getMetrics();
+  }
+
+  /**
+   * Get cache hit/miss statistics
+   */
+  getCacheStats() {
+    const total = this.cacheHits + this.cacheMisses;
+    return {
+      hits: this.cacheHits,
+      misses: this.cacheMisses,
+      total,
+      hitRate: total > 0 ? (this.cacheHits / total) * 100 : 0,
+    };
+  }
+
+  /**
+   * Reset cache hit/miss statistics
+   */
+  resetCacheStats() {
+    this.cacheHits = 0;
+    this.cacheMisses = 0;
   }
 
   /**

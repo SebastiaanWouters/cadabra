@@ -770,3 +770,233 @@ describe("Integration Tests", () => {
     manager.close();
   });
 });
+
+// ========================================
+// ENHANCED INVALIDATION TESTS
+// Tests for new range-based invalidation logic
+// ========================================
+
+describe("Range-Based Invalidation", () => {
+  test("does NOT invalidate when write affects non-overlapping range (>= vs <)", () => {
+    // Cache query: age >= 30
+    const cacheKey = analyzeSELECT("SELECT * FROM users WHERE age >= ?", [30]);
+
+    // Write query: age < 30
+    const writeInfo = analyzeWrite("UPDATE users SET name = ? WHERE age < ?", [
+      "X",
+      30,
+    ]);
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(false);
+  });
+
+  test("does NOT invalidate when write affects non-overlapping range (> vs <=)", () => {
+    // Cache query: age > 30
+    const cacheKey = analyzeSELECT("SELECT * FROM users WHERE age > ?", [30]);
+
+    // Write query: age <= 30
+    const writeInfo = analyzeWrite("UPDATE users SET name = ? WHERE age <= ?", [
+      "X",
+      30,
+    ]);
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(false);
+  });
+
+  test("DOES invalidate when ranges overlap (> vs >=)", () => {
+    // Cache query: age >= 30
+    const cacheKey = analyzeSELECT("SELECT * FROM users WHERE age >= ?", [30]);
+
+    // Write query: age > 25 (overlaps with >= 30)
+    const writeInfo = analyzeWrite("UPDATE users SET name = ? WHERE age > ?", [
+      "X",
+      25,
+    ]);
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(true);
+  });
+
+  test("does NOT invalidate when BETWEEN ranges don't overlap", () => {
+    // Cache query: BETWEEN 10 AND 20
+    const cacheKey = analyzeSELECT(
+      "SELECT * FROM products WHERE price BETWEEN ? AND ?",
+      [10, 20]
+    );
+
+    // Write query: BETWEEN 30 AND 40
+    const writeInfo = analyzeWrite(
+      "UPDATE products SET stock = ? WHERE price BETWEEN ? AND ?",
+      [100, 30, 40]
+    );
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(false);
+  });
+
+  test("DOES invalidate when BETWEEN ranges overlap", () => {
+    // Cache query: BETWEEN 10 AND 30
+    const cacheKey = analyzeSELECT(
+      "SELECT * FROM products WHERE price BETWEEN ? AND ?",
+      [10, 30]
+    );
+
+    // Write query: BETWEEN 20 AND 40 (overlaps)
+    const writeInfo = analyzeWrite(
+      "UPDATE products SET stock = ? WHERE price BETWEEN ? AND ?",
+      [100, 20, 40]
+    );
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(true);
+  });
+
+  test("handles IN clause with range comparison", () => {
+    // Cache query: IN (1,2,3)
+    const cacheKey = analyzeSELECT("SELECT * FROM users WHERE id IN (?)", [
+      [1, 2, 3],
+    ]);
+
+    // Write query: id > 10 (no overlap)
+    const writeInfo = analyzeWrite("UPDATE users SET name = ? WHERE id > ?", [
+      "X",
+      10,
+    ]);
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(false);
+  });
+
+  test("DOES invalidate when IN clause overlaps with range", () => {
+    // Cache query: IN (1,2,3,10,15)
+    const cacheKey = analyzeSELECT("SELECT * FROM users WHERE id IN (?)", [
+      [1, 2, 3, 10, 15],
+    ]);
+
+    // Write query: id >= 10 (overlaps with 10, 15)
+    const writeInfo = analyzeWrite("UPDATE users SET name = ? WHERE id >= ?", [
+      "X",
+      10,
+    ]);
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(true);
+  });
+
+  test("does NOT invalidate when non-selected column modified (with range check)", () => {
+    // Cache query: age > 30, SELECT only name
+    const cacheKey = analyzeSELECT(
+      "SELECT name FROM users WHERE age > ?",
+      [30]
+    );
+
+    // Write query: age > 30, UPDATE email (not selected)
+    const writeInfo = analyzeWrite("UPDATE users SET email = ? WHERE age > ?", [
+      "test@test.com",
+      30,
+    ]);
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(false);
+  });
+
+  test("DOES invalidate when selected column modified with overlapping range", () => {
+    // Cache query: age > 30, SELECT name
+    const cacheKey = analyzeSELECT(
+      "SELECT name FROM users WHERE age > ?",
+      [30]
+    );
+
+    // Write query: age > 25, UPDATE name (selected, overlapping range)
+    const writeInfo = analyzeWrite("UPDATE users SET name = ? WHERE age > ?", [
+      "X",
+      25,
+    ]);
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(true);
+  });
+
+  test("complex scenario: multiple conditions with partial overlap", () => {
+    // Cache query: age > 30 AND status = 'active'
+    const cacheKey = analyzeSELECT(
+      "SELECT * FROM users WHERE age > ? AND status = ?",
+      [30, "active"]
+    );
+
+    // Write query: age <= 30 (no overlap on age)
+    const writeInfo = analyzeWrite("UPDATE users SET name = ? WHERE age <= ?", [
+      "X",
+      30,
+    ]);
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(false);
+  });
+});
+
+describe("DELETE Operation with Range Analysis", () => {
+  test("does NOT invalidate DELETE with non-overlapping range", () => {
+    // Cache query: age >= 30
+    const cacheKey = analyzeSELECT("SELECT * FROM users WHERE age >= ?", [30]);
+
+    // DELETE query: age < 30 (non-overlapping)
+    const writeInfo = analyzeWrite("DELETE FROM users WHERE age < ?", [30]);
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(false);
+  });
+
+  test("DOES invalidate DELETE with overlapping range", () => {
+    // Cache query: age >= 30
+    const cacheKey = analyzeSELECT("SELECT * FROM users WHERE age >= ?", [30]);
+
+    // DELETE query: age > 25 (overlapping)
+    const writeInfo = analyzeWrite("DELETE FROM users WHERE age > ?", [25]);
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(true);
+  });
+});
+
+describe("Batch Operations Performance", () => {
+  test("invalidate multiple entries efficiently", () => {
+    const manager = new CacheManager();
+
+    // Register 100 cache entries for same table
+    const keys = [];
+    for (let i = 1; i <= 100; i++) {
+      const key = analyzeSELECT("SELECT * FROM users WHERE id = ?", [i]);
+      manager.register(key.fingerprint, { id: i }, key);
+      keys.push(key);
+    }
+
+    // Verify all are cached
+    expect(keys[0]).toBeDefined();
+    expect(keys[99]).toBeDefined();
+    expect(manager.get(keys[0]!.fingerprint)).toBeDefined();
+    expect(manager.get(keys[99]!.fingerprint)).toBeDefined();
+
+    // Invalidate with broad UPDATE
+    const writeInfo = analyzeWrite("UPDATE users SET name = ?", ["X"]);
+    const deleted = manager.invalidate(writeInfo);
+
+    // Should have invalidated all (or most, depending on conditions)
+    expect(deleted).toBeGreaterThan(0);
+
+    manager.close();
+  });
+
+  test("clearTable removes all entries for table efficiently", () => {
+    const manager = new CacheManager();
+
+    // Register entries for multiple tables
+    for (let i = 1; i <= 50; i++) {
+      const userKey = analyzeSELECT("SELECT * FROM users WHERE id = ?", [i]);
+      const orderKey = analyzeSELECT("SELECT * FROM orders WHERE id = ?", [i]);
+
+      manager.register(userKey.fingerprint, { id: i }, userKey);
+      manager.register(orderKey.fingerprint, { id: i }, orderKey);
+    }
+
+    // Clear only users table
+    const cleared = manager.clearTable("users");
+    expect(cleared).toBe(50);
+
+    // Orders should still be cached
+    const orderKey = analyzeSELECT("SELECT * FROM orders WHERE id = ?", [1]);
+    expect(manager.get(orderKey.fingerprint)).toBeDefined();
+
+    manager.close();
+  });
+});
