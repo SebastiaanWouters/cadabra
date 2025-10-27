@@ -68,13 +68,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Trigger NPM publish
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'npm-publish.yml',
+              ref: 'main',
+              inputs: {
+                tag: '${{ steps.version.outputs.tag }}'
+              }
+            });
+
       - name: Summary
         run: |
           echo "✅ GitHub Release created: ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "✅ NPM publish workflow triggered" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "This will trigger:" >> $GITHUB_STEP_SUMMARY
+          echo "Running workflows:" >> $GITHUB_STEP_SUMMARY
           echo "- NPM publishing (npm-publish.yml)" >> $GITHUB_STEP_SUMMARY
           echo "- Docker image publishing (docker.yml)" >> $GITHUB_STEP_SUMMARY
-          echo "- Packagist auto-update (webhook)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "View release: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
