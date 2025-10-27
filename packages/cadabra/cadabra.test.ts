@@ -1069,3 +1069,379 @@ describe("Batch Operations Performance", () => {
     expect(shouldInvalidate(cacheKey, writeInfo)).toBe(false);
   });
 });
+
+// ========================================
+// SUBQUERY DETECTION TESTS
+// ========================================
+
+describe("Subquery Detection", () => {
+  test("detects EXISTS subquery", () => {
+    const sql = `
+      SELECT * FROM users
+      WHERE EXISTS (
+        SELECT 1 FROM orders WHERE orders.user_id = users.id
+      )
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBe(true);
+    expect(result.classification).toBe("complex");
+  });
+
+  test("detects NOT EXISTS subquery", () => {
+    const sql = `
+      SELECT * FROM users
+      WHERE NOT EXISTS (
+        SELECT 1 FROM orders WHERE orders.user_id = users.id
+      )
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBe(true);
+    expect(result.classification).toBe("complex");
+  });
+
+  test("detects IN subquery", () => {
+    const sql = `
+      SELECT * FROM users
+      WHERE id IN (SELECT user_id FROM orders WHERE total > 100)
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBe(true);
+    expect(result.classification).toBe("complex");
+  });
+
+  test("detects NOT IN subquery", () => {
+    const sql = `
+      SELECT * FROM users
+      WHERE id NOT IN (SELECT user_id FROM blacklist)
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBe(true);
+    expect(result.classification).toBe("complex");
+  });
+
+  test("detects scalar subquery in WHERE", () => {
+    const sql = `
+      SELECT * FROM products
+      WHERE price > (SELECT AVG(price) FROM products)
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBe(true);
+    expect(result.classification).toBe("complex");
+  });
+
+  test("detects derived table (subquery in FROM)", () => {
+    const sql = `
+      SELECT u.name
+      FROM (SELECT * FROM users WHERE active = 1) AS u
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBe(true);
+    expect(result.classification).toBe("complex");
+  });
+
+  test("does NOT detect IN with literal values as subquery", () => {
+    const sql = "SELECT * FROM users WHERE id IN (1, 2, 3)";
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBeUndefined();
+    // IN with id is classified as row-lookup (primary key condition)
+    expect(result.classification).toBe("row-lookup");
+  });
+
+  test("simple query without subquery", () => {
+    const sql = "SELECT * FROM users WHERE id = 10";
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBeUndefined();
+    expect(result.classification).toBe("row-lookup");
+  });
+
+  test("aggregate query without subquery", () => {
+    const sql = "SELECT COUNT(*) FROM users WHERE active = 1";
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBeUndefined();
+    expect(result.classification).toBe("aggregate");
+  });
+
+  test("join query without subquery", () => {
+    const sql = `
+      SELECT u.name, o.total
+      FROM users u
+      JOIN orders o ON u.id = o.user_id
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBeUndefined();
+    expect(result.classification).toBe("join");
+  });
+});
+
+// ========================================
+// SET OPERATION TESTS (UNION/INTERSECT/EXCEPT)
+// ========================================
+
+describe("Set Operation Detection", () => {
+  test("detects UNION", () => {
+    const sql = `
+      SELECT id, name FROM users WHERE active = 1
+      UNION
+      SELECT id, name FROM admins
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.setOperation).toBe("UNION");
+    expect(result.classification).toBe("complex");
+  });
+
+  test("detects UNION ALL", () => {
+    const sql = `
+      SELECT id, name FROM users
+      UNION ALL
+      SELECT id, name FROM archived_users
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.setOperation).toBe("UNION ALL");
+    expect(result.classification).toBe("complex");
+  });
+
+  test("detects INTERSECT", () => {
+    const sql = `
+      SELECT id FROM users WHERE active = 1
+      INTERSECT
+      SELECT user_id FROM orders WHERE total > 100
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.setOperation).toBe("INTERSECT");
+    expect(result.classification).toBe("complex");
+  });
+
+  test("detects EXCEPT", () => {
+    const sql = `
+      SELECT id FROM users
+      EXCEPT
+      SELECT user_id FROM banned_users
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.setOperation).toBe("EXCEPT");
+    expect(result.classification).toBe("complex");
+  });
+
+  test("detects chained UNION operations", () => {
+    const sql = `
+      SELECT id FROM users
+      UNION
+      SELECT id FROM admins
+      UNION
+      SELECT id FROM moderators
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.setOperation).toBe("UNION");
+    expect(result.classification).toBe("complex");
+  });
+
+  test("UNION with ORDER BY and LIMIT", () => {
+    const sql = `
+      SELECT id, name FROM users
+      UNION
+      SELECT id, name FROM admins
+      ORDER BY name
+      LIMIT 10
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.setOperation).toBe("UNION");
+    expect(result.classification).toBe("complex");
+    expect(result.limit).toBe(10);
+  });
+
+  test("simple query without set operation", () => {
+    const sql = "SELECT * FROM users WHERE id = 10";
+    const result = analyzeSELECT(sql);
+
+    expect(result.setOperation).toBeUndefined();
+    expect(result.classification).toBe("row-lookup");
+  });
+});
+
+// ========================================
+// ENHANCED CLASSIFICATION TESTS
+// ========================================
+
+describe("Enhanced Query Classification", () => {
+  test("subquery overrides row-lookup classification", () => {
+    // This would normally be row-lookup, but subquery makes it complex
+    const sql = `
+      SELECT * FROM users
+      WHERE id = 10
+      AND EXISTS (SELECT 1 FROM orders WHERE user_id = users.id)
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBe(true);
+    expect(result.classification).toBe("complex");
+  });
+
+  test("set operation overrides aggregate classification", () => {
+    // Both parts are aggregates, but UNION makes it complex
+    const sql = `
+      SELECT COUNT(*) FROM users WHERE active = 1
+      UNION
+      SELECT COUNT(*) FROM admins
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.setOperation).toBe("UNION");
+    expect(result.classification).toBe("complex");
+  });
+
+  test("set operation overrides join classification", () => {
+    // Both parts are joins, but UNION makes it complex
+    const sql = `
+      SELECT u.id FROM users u JOIN orders o ON u.id = o.user_id
+      UNION
+      SELECT a.id FROM admins a JOIN admin_logs l ON a.id = l.admin_id
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.setOperation).toBe("UNION");
+    expect(result.classification).toBe("complex");
+  });
+
+  test("complex query with subquery and join", () => {
+    const sql = `
+      SELECT u.name, o.total
+      FROM users u
+      JOIN orders o ON u.id = o.user_id
+      WHERE u.id IN (SELECT user_id FROM premium_members)
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBe(true);
+    expect(result.classification).toBe("complex");
+  });
+
+  test("complex query with subquery and aggregate", () => {
+    const sql = `
+      SELECT COUNT(*)
+      FROM users
+      WHERE id IN (SELECT user_id FROM orders WHERE total > 100)
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBe(true);
+    expect(result.classification).toBe("complex");
+  });
+
+  test("row-lookup remains row-lookup without subquery or set operation", () => {
+    const sql = "SELECT * FROM users WHERE id = 10";
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBeUndefined();
+    expect(result.setOperation).toBeUndefined();
+    expect(result.classification).toBe("row-lookup");
+  });
+
+  test("aggregate remains aggregate without subquery or set operation", () => {
+    const sql = "SELECT COUNT(*) FROM users WHERE active = 1";
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBeUndefined();
+    expect(result.setOperation).toBeUndefined();
+    expect(result.classification).toBe("aggregate");
+  });
+
+  test("join remains join without subquery or set operation", () => {
+    const sql = `
+      SELECT u.name, o.total
+      FROM users u
+      JOIN orders o ON u.id = o.user_id
+      WHERE u.active = 1
+    `;
+    const result = analyzeSELECT(sql);
+
+    expect(result.hasSubquery).toBeUndefined();
+    expect(result.setOperation).toBeUndefined();
+    expect(result.classification).toBe("join");
+  });
+});
+
+// ========================================
+// FINGERPRINT STABILITY FOR NEW FEATURES
+// ========================================
+
+describe("Fingerprint Stability with Subqueries and Set Operations", () => {
+  test("generates different fingerprints for queries with and without subquery", () => {
+    const sql1 = "SELECT * FROM users WHERE id = 10";
+    const sql2 = `
+      SELECT * FROM users
+      WHERE id = 10
+      AND EXISTS (SELECT 1 FROM orders WHERE user_id = users.id)
+    `;
+
+    const result1 = analyzeSELECT(sql1);
+    const result2 = analyzeSELECT(sql2);
+
+    expect(result1.fingerprint).not.toBe(result2.fingerprint);
+  });
+
+  test("generates different fingerprints for UNION vs simple query", () => {
+    const sql1 = "SELECT id, name FROM users";
+    const sql2 = `
+      SELECT id, name FROM users
+      UNION
+      SELECT id, name FROM admins
+    `;
+
+    const result1 = analyzeSELECT(sql1);
+    const result2 = analyzeSELECT(sql2);
+
+    expect(result1.fingerprint).not.toBe(result2.fingerprint);
+  });
+
+  test("generates different fingerprints for UNION vs UNION ALL", () => {
+    const sql1 = `
+      SELECT id FROM users
+      UNION
+      SELECT id FROM admins
+    `;
+    const sql2 = `
+      SELECT id FROM users
+      UNION ALL
+      SELECT id FROM admins
+    `;
+
+    const result1 = analyzeSELECT(sql1);
+    const result2 = analyzeSELECT(sql2);
+
+    expect(result1.fingerprint).not.toBe(result2.fingerprint);
+    expect(result1.setOperation).toBe("UNION");
+    expect(result2.setOperation).toBe("UNION ALL");
+  });
+
+  test("generates same fingerprint for equivalent subqueries", () => {
+    const sql1 = `
+      SELECT * FROM users
+      WHERE EXISTS (SELECT 1 FROM orders WHERE user_id = users.id)
+    `;
+    const sql2 = `
+      SELECT * FROM users
+      WHERE EXISTS (SELECT 1 FROM orders WHERE user_id = users.id)
+    `;
+
+    const result1 = analyzeSELECT(sql1);
+    const result2 = analyzeSELECT(sql2);
+
+    expect(result1.fingerprint).toBe(result2.fingerprint);
+  });
+});

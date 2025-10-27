@@ -60,6 +60,8 @@ type CacheKey = {
   limit?: number;
   offset?: number;
   distinct?: boolean;
+  hasSubquery?: boolean;
+  setOperation?: "UNION" | "UNION ALL" | "INTERSECT" | "EXCEPT";
 };
 
 type InvalidationInfo = {
@@ -727,6 +729,13 @@ function extractOrderBy(
   ast: AST
 ): Array<{ column: string; order: "ASC" | "DESC" }> {
   const orderByClause = "orderby" in ast ? ast.orderby : null;
+
+  // For UNION queries, check _next node
+  if (!orderByClause && "_next" in ast && ast._next) {
+    const nextNode = ast._next as AST;
+    return extractOrderBy(nextNode);
+  }
+
   if (!Array.isArray(orderByClause)) {
     return [];
   }
@@ -742,6 +751,13 @@ function extractOrderBy(
  */
 function extractLimit(ast: AST): number | undefined {
   const limitClause = "limit" in ast ? ast.limit : null;
+
+  // For UNION queries, check _next node
+  if (!limitClause && "_next" in ast && ast._next) {
+    const nextNode = ast._next as AST;
+    return extractLimit(nextNode);
+  }
+
   if (!limitClause) {
     return;
   }
@@ -797,6 +813,162 @@ function extractDistinct(ast: AST): boolean {
   return distinctClause === "DISTINCT" || distinctClause === true;
 }
 
+/**
+ * Recursively detects subqueries in AST nodes
+ * Checks for:
+ * - IN subqueries (empty arrays from parser when subquery present)
+ * - EXISTS/NOT EXISTS (already marked in conditions)
+ * - Scalar subqueries in WHERE clause
+ */
+function detectSubqueryInNode(node: unknown): boolean {
+  if (!node || typeof node !== "object") {
+    return false;
+  }
+
+  const obj = node as Record<string, unknown>;
+
+  // Check if this node is a subquery (SELECT node nested in another context)
+  if (obj.type === "select" && obj.from) {
+    return true;
+  }
+
+  // IN subquery detection - parser returns empty array or select node for subquery
+  if (obj.type === "in_expr") {
+    const valueObj = obj.value as Record<string, unknown> | undefined;
+    if (valueObj?.type === "select") {
+      return true;
+    }
+    // TiDB parser behavior: empty array for IN subquery
+    if (Array.isArray(obj.value) && obj.value.length === 0) {
+      return true;
+    }
+  }
+
+  // EXISTS/NOT EXISTS with subquery
+  if (obj.type === "exists_expr" && obj.value) {
+    const valueObj = obj.value as Record<string, unknown> | undefined;
+    if (valueObj?.type === "select") {
+      return true;
+    }
+  }
+
+  // Binary expressions - check both sides
+  if (
+    obj.type === "binary_expr" &&
+    (detectSubqueryInNode(obj.left) || detectSubqueryInNode(obj.right))
+  ) {
+    return true;
+  }
+
+  // Check nested structures
+  for (const value of Object.values(obj)) {
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      detectSubqueryInNode(value)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Detects if query contains subqueries
+ */
+function detectSubquery(ast: AST, conditions: Condition[]): boolean {
+  // Check for EXISTS/NOT EXISTS in conditions (already detected)
+  const hasExistsSubquery = conditions.some(
+    (c) => c.operator === "EXISTS" || c.operator === "NOT EXISTS"
+  );
+
+  if (hasExistsSubquery) {
+    return true;
+  }
+
+  // Check WHERE clause for nested subqueries
+  if ("where" in ast && ast.where && detectSubqueryInNode(ast.where)) {
+    return true;
+  }
+
+  // Check FROM clause for subqueries (derived tables)
+  if ("from" in ast && Array.isArray(ast.from)) {
+    for (const fromItem of ast.from) {
+      if (fromItem && typeof fromItem === "object") {
+        const fromItemObj = fromItem as unknown as Record<string, unknown>;
+
+        // Check for derived table (subquery in FROM)
+        if ("expr" in fromItemObj && fromItemObj.expr) {
+          const exprObj = fromItemObj.expr as Record<string, unknown>;
+
+          // Check if expr has an ast property (derived table)
+          if ("ast" in exprObj && exprObj.ast) {
+            const astObj = exprObj.ast as Record<string, unknown>;
+            if (astObj.type === "select") {
+              return true;
+            }
+          }
+
+          // Also check if expr itself is a select
+          if (exprObj.type === "select") {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Detects set operations (UNION, INTERSECT, EXCEPT)
+ */
+function detectSetOperation(
+  ast: AST | AST[]
+): "UNION" | "UNION ALL" | "INTERSECT" | "EXCEPT" | undefined {
+  // Check if AST is an array (multiple statements)
+  if (Array.isArray(ast)) {
+    // Check each statement
+    for (const node of ast) {
+      const result = detectSetOperation(node);
+      if (result) {
+        return result;
+      }
+    }
+    return;
+  }
+
+  // Check for set operation in single AST node
+  const astObj = ast as unknown as Record<string, unknown>;
+
+  // node-sql-parser represents set operations as "set_op" property
+  if ("set_op" in astObj && astObj.set_op) {
+    const setOp = (astObj.set_op as string).toLowerCase();
+
+    if (setOp === "union all") {
+      return "UNION ALL";
+    }
+    if (setOp === "union") {
+      return "UNION";
+    }
+    if (setOp === "intersect") {
+      return "INTERSECT";
+    }
+    if (setOp === "except") {
+      return "EXCEPT";
+    }
+  }
+
+  // Check _next property for chained set operations
+  if ("_next" in astObj && astObj._next) {
+    return detectSetOperation(astObj._next as AST);
+  }
+
+  return;
+}
+
 // ============================================
 // SECTION 5: QUERY CLASSIFICATION
 // ============================================
@@ -818,9 +990,23 @@ function hasSimplePKCondition(conditions: Condition[]): boolean {
 function classifyQuery(
   tables: TableAccess[],
   conditions: Condition[],
-  hasAggregates: boolean
+  options: {
+    hasAggregates: boolean;
+    hasSubquery: boolean;
+    hasSetOperation: boolean;
+  }
 ): "row-lookup" | "aggregate" | "join" | "complex" {
-  if (hasAggregates) {
+  // Set operations (UNION/INTERSECT/EXCEPT) are always complex
+  if (options.hasSetOperation) {
+    return "complex";
+  }
+
+  // Queries with subqueries are always complex
+  if (options.hasSubquery) {
+    return "complex";
+  }
+
+  if (options.hasAggregates) {
     return "aggregate";
   }
   if (tables.length > 1) {
@@ -843,16 +1029,27 @@ function classifyQuery(
  * Generates deterministic fingerprint from cache key
  */
 function generateFingerprint(cacheKey: CacheKey): string {
-  const { tables, classification, orderBy, limit, offset, distinct } = cacheKey;
+  const {
+    tables,
+    classification,
+    orderBy,
+    limit,
+    offset,
+    distinct,
+    hasSubquery,
+    setOperation,
+  } = cacheKey;
 
-  // Simple row lookup: human-readable format (if no ORDER BY/LIMIT/OFFSET/DISTINCT)
+  // Simple row lookup: human-readable format (if no ORDER BY/LIMIT/OFFSET/DISTINCT/SUBQUERY/SET_OP)
   if (
     classification === "row-lookup" &&
     tables.length === 1 &&
     !orderBy &&
     !limit &&
     !offset &&
-    !distinct
+    !distinct &&
+    !hasSubquery &&
+    !setOperation
   ) {
     const table = tables[0];
 
@@ -900,6 +1097,8 @@ function generateFingerprint(cacheKey: CacheKey): string {
     limit,
     offset,
     distinct,
+    hasSubquery,
+    setOperation,
   };
 
   const hash = createHash("sha256")
@@ -939,6 +1138,10 @@ function analyzeSELECT(
   const limit = extractLimit(astNode);
   const offset = extractOffset(astNode);
   const distinct = extractDistinct(astNode);
+
+  // 4b. Detect subqueries and set operations
+  const hasSubquery = detectSubquery(astNode, conditions);
+  const setOperation = detectSetOperation(ast);
 
   // 5. Attach columns and conditions to tables
   if (tables.length === 1 && tables[0]) {
@@ -983,11 +1186,11 @@ function analyzeSELECT(
   }
 
   // 6. Classify query
-  const classification = classifyQuery(
-    tables,
-    conditions,
-    aggregates.length > 0
-  );
+  const classification = classifyQuery(tables, conditions, {
+    hasAggregates: aggregates.length > 0,
+    hasSubquery,
+    hasSetOperation: !!setOperation,
+  });
 
   // 7. Build cache key
   const cacheKey: CacheKey = {
@@ -998,6 +1201,8 @@ function analyzeSELECT(
     limit,
     offset,
     distinct: distinct || undefined,
+    hasSubquery: hasSubquery || undefined,
+    setOperation: setOperation || undefined,
     fingerprint: "",
   };
 
