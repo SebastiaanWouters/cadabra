@@ -61,8 +61,8 @@ jobs:
       - name: Type check
         run: bun run tsc
 
-      - name: Run core tests
-        run: bun run test:cadabra
+      - name: Run unit tests
+        run: bun run test:unit
 
       - name: Setup integration test database
         working-directory: packages/integration-tests
