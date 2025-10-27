@@ -1,4 +1,4 @@
-name: Release Automation
+name: Release
 
 on:
   push:
@@ -7,14 +7,16 @@ on:
 
 permissions:
   contents: write
+  packages: write
+  id-token: write
 
 jobs:
-  # Run CI checks before creating release
+  # Run all quality checks once
   quality-checks:
     name: Quality Checks
     uses: ./.github/workflows/ci.yml
 
-  # Create GitHub Release after CI passes
+  # Create GitHub Release
   create-release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
@@ -72,12 +74,22 @@ jobs:
         run: |
           echo "✅ GitHub Release created: ${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "⚠️  Manually trigger NPM publish:" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
-          echo "gh workflow run npm-publish.yml -f tag=${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Running workflows:" >> $GITHUB_STEP_SUMMARY
-          echo "- Docker image publishing (docker.yml)" >> $GITHUB_STEP_SUMMARY
+          echo "📦 Publishing packages in parallel:" >> $GITHUB_STEP_SUMMARY
+          echo "  - NPM (npm-publish workflow)" >> $GITHUB_STEP_SUMMARY
+          echo "  - Docker (docker workflow)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "View release: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+
+  # Publish to NPM (runs in parallel with docker after CI passes)
+  publish-npm:
+    name: Publish to NPM
+    needs: quality-checks
+    uses: ./.github/workflows/npm-publish.yml
+    secrets: inherit
+
+  # Build and push Docker image (runs in parallel with npm after CI passes)
+  publish-docker:
+    name: Build Docker Image
+    needs: quality-checks
+    uses: ./.github/workflows/docker.yml
+    secrets: inherit

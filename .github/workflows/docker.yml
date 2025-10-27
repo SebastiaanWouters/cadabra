@@ -1,9 +1,7 @@
 name: Docker
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  workflow_call:
   workflow_dispatch:
 
 env:
@@ -11,15 +9,9 @@ env:
   IMAGE_NAME: sebastiaanwouters/cadabra
 
 jobs:
-  # Run CI checks first
-  quality-checks:
-    name: Quality Checks
-    uses: ./.github/workflows/ci.yml
-
   build-and-push:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
-    needs: quality-checks
     permissions:
       contents: read
       packages: write
