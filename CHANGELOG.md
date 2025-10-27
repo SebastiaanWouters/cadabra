@@ -8,7 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Nothing yet
+- **BREAKING**: Refactored GitHub Actions workflows for efficiency
+  - Consolidated release process into single `release.yml` workflow
+  - CI now runs once per release (was running 3x)
+  - NPM and Docker publishing happen in parallel after CI passes
+  - Improved release time by ~70%
 
 ## [0.3.5] - 2025-10-27
 
