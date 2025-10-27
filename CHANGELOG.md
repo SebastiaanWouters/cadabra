@@ -5,19 +5,26 @@ All notable changes to Cadabra will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] - 2025-10-27
-
-### Added
-- Release version 0.4.0
-
 ## [Unreleased]
 
 ### Changed
-- **BREAKING**: Refactored GitHub Actions workflows for efficiency
-  - Consolidated release process into single `release.yml` workflow
-  - CI now runs once per release (was running 3x)
-  - NPM and Docker publishing happen in parallel after CI passes
-  - Improved release time by ~70%
+- Nothing yet
+
+## [0.4.0] - 2025-10-27
+
+### Changed
+- **Simplified GitHub Actions to single ci-cd.yml workflow**
+  - All jobs (lint, test, docker, release, npm) now in one file
+  - No more workflow_call complexity
+  - Docker builds on every push (SHA tags) + version tags
+  - Release/NPM only on version tags
+  - Reduced from 298 lines (4 files) to 222 lines (1 file)
+- **BREAKING**: Package renamed to `@sebastiaanwouters/cadabra` (completed in 0.3.3)
+
+### Fixed
+- Multiple workflow refactoring fixes (0.3.4-0.3.5)
+- Root package.json test script filter
+- Integration tests workspace dependency
 
 ## [0.3.5] - 2025-10-27
 
@@ -104,7 +111,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced composer.json metadata for Packagist
 - SQLite in-memory database for tests (removed PostgreSQL dependency)
 
-[Unreleased]: https://github.com/SebastiaanWouters/cadabra/compare/v0.3.5...HEAD
+[Unreleased]: https://github.com/SebastiaanWouters/cadabra/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/SebastiaanWouters/cadabra/releases/tag/v0.4.0
 [0.3.5]: https://github.com/SebastiaanWouters/cadabra/releases/tag/v0.3.5
 [0.3.4]: https://github.com/SebastiaanWouters/cadabra/releases/tag/v0.3.4
 [0.3.3]: https://github.com/SebastiaanWouters/cadabra/releases/tag/v0.3.3
