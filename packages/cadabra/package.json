@@ -1,7 +1,7 @@
 {
   "name": "@sebastiaanwouters/cadabra",
   "version": "0.4.1",
-  "description": "Intelligent query cache with automatic invalidation - SQL parser, cache key generation, and invalidation analysis",
+  "description": "Intelligent query cache library - SQL parser, cache key generation, and invalidation analysis. Server binaries available via GitHub Releases.",
   "type": "module",
   "module": "index.ts",
   "main": "index.ts",
@@ -16,11 +16,7 @@
       "types": "./server.ts"
     }
   },
-  "bin": {
-    "cadabra": "./bin/cadabra.js"
-  },
   "files": [
-    "bin/",
     "cadabra.ts",
     "index.ts",
     "server.ts",

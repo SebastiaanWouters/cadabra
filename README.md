@@ -4,7 +4,54 @@ Intelligent query cache system with automatic invalidation. This repository cont
 
 > **PHP Client**: For PHP/Symfony integration, see [cadabra-php](https://github.com/SebastiaanWouters/cadabra-php)
 
-## Quick Start
+## Installation
+
+### Server (Standalone Binary)
+
+Install the Cadabra server with a single command:
+
+**Linux / macOS:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/SebastiaanWouters/cadabra/main/scripts/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/SebastiaanWouters/cadabra/main/scripts/install.ps1 | iex
+```
+
+Then start the server:
+```bash
+cadabra
+```
+
+### Library (NPM Package)
+
+For programmatic usage in your TypeScript/JavaScript projects:
+
+```bash
+npm install @sebastiaanwouters/cadabra
+bun add @sebastiaanwouters/cadabra
+```
+
+### Manual Download
+
+Download pre-compiled binaries from [GitHub Releases](https://github.com/SebastiaanWouters/cadabra/releases):
+
+- `cadabra-linux-x64` - Linux x86_64
+- `cadabra-linux-arm64` - Linux ARM64
+- `cadabra-darwin-x64` - macOS Intel
+- `cadabra-darwin-arm64` - macOS Apple Silicon
+- `cadabra-windows-x64.exe` - Windows x64
+
+### Docker
+
+```bash
+docker pull ghcr.io/sebastiaanwouters/cadabra:latest
+docker run -p 6942:6942 ghcr.io/sebastiaanwouters/cadabra:latest
+```
+
+## Quick Start (Development)
 
 ```bash
 # 1. Install tool versions (Bun 1.3)
@@ -18,7 +65,7 @@ bun run test
 bun run check
 ```
 
-That's it! See [CLAUDE.md](./CLAUDE.md) for detailed development guide.
+See [CLAUDE.md](./CLAUDE.md) for detailed development guide.
 
 ## Prerequisites
 
@@ -164,25 +211,41 @@ GitHub Actions will then automatically:
 
 See [PUBLISHING.md](./PUBLISHING.md) for detailed release process.
 
-## Using Published Packages
+## Distribution
 
-### TypeScript/JavaScript (NPM)
+Cadabra is distributed in multiple formats to suit different needs:
+
+### 1. Standalone Binaries (Recommended for Server)
+Pre-compiled executables available via [GitHub Releases](https://github.com/SebastiaanWouters/cadabra/releases):
+- No dependencies required (Bun is embedded)
+- Fast startup and execution
+- Cross-platform support (Linux, macOS, Windows, ARM64)
+- Install via one-liner (see Installation section above)
+
+### 2. NPM Package (For Library Usage)
 ```bash
-npm install cadabra
-bun add cadabra
+npm install @sebastiaanwouters/cadabra
 ```
+Use this for:
+- Programmatic SQL analysis in your JavaScript/TypeScript projects
+- Integrating cache key generation into your application
+- **Note**: The NPM package is library-only; use binaries for the server
 
-### Docker
+### 3. Docker Images
 ```bash
 docker pull ghcr.io/sebastiaanwouters/cadabra:latest
-docker run -p 6942:6942 ghcr.io/sebastiaanwouters/cadabra:latest
 ```
+Best for:
+- Container orchestration (Kubernetes, Docker Compose)
+- Cloud deployments
+- Isolated server environments
 
-### PHP/Symfony
+### 4. PHP Client
 See the separate [cadabra-php](https://github.com/SebastiaanWouters/cadabra-php) repository:
 ```bash
 composer require cadabra/php
 ```
+For Symfony/Doctrine integration with Cadabra server.
 
 ## Documentation
 

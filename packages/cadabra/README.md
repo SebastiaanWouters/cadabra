@@ -15,23 +15,11 @@ Cadabra is a high-performance query caching system that automatically invalidate
 
 ## Installation
 
-### As a Global CLI (requires Bun)
-
-Install globally to get the `cadabra` command:
-
-```bash
-npm install -g cadabra
-```
-
-Then start the server:
-
-```bash
-cadabra
-```
+> **Note**: This NPM package is the **library-only** distribution. For the Cadabra server, use standalone binaries or Docker.
 
 ### As a Library
 
-Install as a dependency in your project:
+Install as a dependency in your TypeScript/JavaScript project:
 
 ```bash
 # npm
@@ -47,15 +35,25 @@ pnpm add @sebastiaanwouters/cadabra
 yarn add @sebastiaanwouters/cadabra
 ```
 
-### One-Off Execution
+### Server Installation
 
-Run without installing:
+For running the Cadabra HTTP server, use one of these methods:
 
+#### Option 1: Standalone Binary (Recommended)
+
+Download pre-compiled binaries from [GitHub Releases](https://github.com/SebastiaanWouters/cadabra/releases) or install via one-liner:
+
+**Linux / macOS:**
 ```bash
-bunx cadabra
+curl -fsSL https://raw.githubusercontent.com/SebastiaanWouters/cadabra/main/scripts/install.sh | bash
 ```
 
-### Via Docker
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/SebastiaanWouters/cadabra/main/scripts/install.ps1 | iex
+```
+
+#### Option 2: Docker
 
 ```bash
 docker pull ghcr.io/sebastiaanwouters/cadabra:latest
@@ -63,14 +61,6 @@ docker run -p 6942:6942 ghcr.io/sebastiaanwouters/cadabra:latest
 ```
 
 ## Runtime Compatibility
-
-### Server (HTTP API)
-
-**Requires Bun** - The server uses Bun-specific APIs (`bun:sqlite`, `Bun.serve`) for optimal performance.
-
-- ✅ Bun 1.0+
-- ❌ Node.js (server not compatible, use Docker instead)
-- ❌ Deno (server not compatible, use Docker instead)
 
 ### Library (SQL Analysis Functions)
 
@@ -91,14 +81,22 @@ console.log(analysis.tables);      // ['users']
 
 **Note**: The `CacheManager` class requires Bun due to `bun:sqlite` dependency.
 
+### Server (HTTP API)
+
+The server is distributed as **standalone binaries** with Bun embedded. No runtime dependencies required!
+
+- ✅ Linux (x64, ARM64)
+- ✅ macOS (Intel, Apple Silicon)
+- ✅ Windows (x64)
+
 ## Usage
 
-### Starting the Server
+### Running the Server
 
-The server runs on port 6942 by default. Customize with environment variables:
+After installing the binary (see Installation section above), start the server:
 
 ```bash
-# Default settings
+# Default settings (port 6942)
 cadabra
 
 # Custom port and host
