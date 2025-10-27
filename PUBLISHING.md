@@ -228,13 +228,35 @@ Three workflows automate the publishing process:
 
 ### Setting Up GitHub Secrets
 
-Add these secrets in **Settings → Secrets → Actions**:
+#### NPM_TOKEN (Required for NPM Publishing)
 
-```bash
-NPM_TOKEN          # NPM access token (required for NPM publishing)
-```
+**Step 1: Create NPM Access Token**
 
-`GITHUB_TOKEN` is automatically provided by GitHub Actions.
+1. Go to [npmjs.com/settings/tokens](https://www.npmjs.com/settings/tokens)
+2. Click **"Generate New Token"** → **"Classic Token"**
+3. Select **"Automation"** token type
+4. Set permissions:
+   - ✅ **Read and write** (required for publishing)
+5. Click **"Generate Token"**
+6. **Copy the token immediately** (you won't see it again!)
+
+**Step 2: Add Token to GitHub Repository**
+
+1. Go to your repository on GitHub
+2. Click **Settings** → **Secrets and variables** → **Actions**
+3. Click **"New repository secret"**
+4. Enter:
+   - **Name**: `NPM_TOKEN`
+   - **Secret**: Paste your NPM token from Step 1
+5. Click **"Add secret"**
+
+**Step 3: Verify Setup**
+
+The NPM publishing workflow will now check for the token and provide clear error messages if it's missing or invalid.
+
+#### GITHUB_TOKEN
+
+`GITHUB_TOKEN` is automatically provided by GitHub Actions - no setup needed!
 
 ## Versioning
 
@@ -262,7 +284,17 @@ Use the release script to keep everything synchronized:
 
 ### NPM Publishing Issues
 
-**Error: "You must be logged in to publish packages"**
+**Error: "npm error code ENEEDAUTH" or "need auth"**
+
+This means the `NPM_TOKEN` GitHub secret is not set or is invalid.
+
+**Fix:**
+1. Create an NPM access token (see [Setting Up GitHub Secrets](#setting-up-github-secrets))
+2. Add it to GitHub: `Settings → Secrets → Actions → New secret`
+3. Name: `NPM_TOKEN`, Value: your token
+4. Re-run the workflow
+
+**Error: "You must be logged in to publish packages"** (Manual publishing)
 ```bash
 npm login
 # Follow prompts
@@ -271,6 +303,7 @@ npm login
 **Error: "You do not have permission to publish"**
 - Check package name isn't taken: `npm info cadabra`
 - Ensure `publishConfig.access` is set to `public` in package.json
+- Verify your NPM token has "Read and write" permissions
 
 **Error: "Version already published"**
 ```bash
