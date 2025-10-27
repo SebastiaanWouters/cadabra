@@ -188,8 +188,10 @@ function handleGetCache(_req: Request, fingerprint: string): Response {
     metrics.cacheHits++;
     log("debug", "Cache hit", { fingerprint });
 
-    // Return the raw serialized data (PHP will unserialize it)
-    return jsonResponse({ result });
+    // Return base64-encoded data (PHP client expects this format)
+    // Result is stored as raw serialized PHP string, encode it back to base64
+    const encoded = Buffer.from(result as string, "utf-8").toString("base64");
+    return jsonResponse({ result: encoded });
   } catch (error) {
     log("error", "Failed to get cache", { error, fingerprint });
     return errorResponse(
