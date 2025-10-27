@@ -964,8 +964,12 @@ describe("Batch Operations Performance", () => {
     // Verify all are cached
     expect(keys[0]).toBeDefined();
     expect(keys[99]).toBeDefined();
-    expect(manager.get(keys[0]!.fingerprint)).toBeDefined();
-    expect(manager.get(keys[99]!.fingerprint)).toBeDefined();
+    if (keys[0]) {
+      expect(manager.get(keys[0].fingerprint)).toBeDefined();
+    }
+    if (keys[99]) {
+      expect(manager.get(keys[99].fingerprint)).toBeDefined();
+    }
 
     // Invalidate with broad UPDATE
     const writeInfo = analyzeWrite("UPDATE users SET name = ?", ["X"]);
@@ -998,5 +1002,70 @@ describe("Batch Operations Performance", () => {
     expect(manager.get(orderKey.fingerprint)).toBeDefined();
 
     manager.close();
+  });
+
+  test("does NOT invalidate when IN values don't match equality (IN operator precision)", () => {
+    // Cache query with IN (1, 100)
+    const cacheKey = analyzeSELECT("SELECT * FROM users WHERE id IN (1, 100)");
+
+    // Write with id = 50 (not in the IN set)
+    const writeInfo = analyzeWrite("UPDATE users SET name = ? WHERE id = 50", [
+      "X",
+      50,
+    ]);
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(false);
+  });
+
+  test("DOES invalidate when IN values match equality (IN operator precision)", () => {
+    // Cache query with IN (1, 100)
+    const cacheKey = analyzeSELECT("SELECT * FROM users WHERE id IN (1, 100)");
+
+    // Write with id = 100 (IS in the IN set)
+    const writeInfo = analyzeWrite("UPDATE users SET name = ? WHERE id = 100", [
+      "X",
+      100,
+    ]);
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(true);
+  });
+
+  test("does NOT invalidate when IN sets don't intersect (IN vs IN)", () => {
+    // Cache query with IN (1, 2, 3)
+    const cacheKey = analyzeSELECT("SELECT * FROM users WHERE id IN (1, 2, 3)");
+
+    // Write with IN (10, 20, 30) (no intersection)
+    const writeInfo = analyzeWrite(
+      "UPDATE users SET name = ? WHERE id IN (10, 20, 30)",
+      ["X", 10, 20, 30]
+    );
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(false);
+  });
+
+  test("DOES invalidate when IN sets intersect (IN vs IN)", () => {
+    // Cache query with IN (1, 2, 3)
+    const cacheKey = analyzeSELECT("SELECT * FROM users WHERE id IN (1, 2, 3)");
+
+    // Write with IN (3, 4, 5) (intersection at 3)
+    const writeInfo = analyzeWrite(
+      "UPDATE users SET name = ? WHERE id IN (3, 4, 5)",
+      ["X", 3, 4, 5]
+    );
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(true);
+  });
+
+  test("symmetric: does NOT invalidate when equality doesn't match IN values", () => {
+    // Cache query with id = 50
+    const cacheKey = analyzeSELECT("SELECT * FROM users WHERE id = 50");
+
+    // Write with IN (1, 100) (doesn't include 50)
+    const writeInfo = analyzeWrite(
+      "UPDATE users SET name = ? WHERE id IN (1, 100)",
+      ["X", 1, 100]
+    );
+
+    expect(shouldInvalidate(cacheKey, writeInfo)).toBe(false);
   });
 });

@@ -1287,11 +1287,23 @@ function rangesOverlap(cond1: Condition, cond2: Condition): boolean {
     c1Min = getNumValue(cond1.value[0]);
     c1Max = getNumValue(cond1.value[1]);
   } else if (cond1.operator === "IN" && Array.isArray(cond1.value)) {
-    // For IN, get min and max of the set
     const numValues = cond1.value
       .map(getNumValue)
       .filter((v): v is number => v !== null);
     if (numValues.length > 0) {
+      // For IN with equality on the other side, check exact match
+      if (cond2.operator === "=" && isNumeric(cond2.value)) {
+        const val2 = getNumValue(cond2.value);
+        return val2 !== null && numValues.includes(val2);
+      }
+      // For IN with IN, check set intersection
+      if (cond2.operator === "IN" && Array.isArray(cond2.value)) {
+        const numValues2 = cond2.value
+          .map(getNumValue)
+          .filter((v): v is number => v !== null);
+        return numValues.some((v) => numValues2.includes(v));
+      }
+      // Otherwise, fall back to range-based analysis
       c1Min = Math.min(...numValues);
       c1Max = Math.max(...numValues);
     }
@@ -1320,11 +1332,17 @@ function rangesOverlap(cond1: Condition, cond2: Condition): boolean {
     c2Min = getNumValue(cond2.value[0]);
     c2Max = getNumValue(cond2.value[1]);
   } else if (cond2.operator === "IN" && Array.isArray(cond2.value)) {
-    // For IN, get min and max of the set
     const numValues = cond2.value
       .map(getNumValue)
       .filter((v): v is number => v !== null);
     if (numValues.length > 0) {
+      // For IN with equality on the other side, check exact match
+      if (cond1.operator === "=" && isNumeric(cond1.value)) {
+        const val1 = getNumValue(cond1.value);
+        return val1 !== null && numValues.includes(val1);
+      }
+      // For IN with IN, already handled in cond1 branch
+      // Otherwise, fall back to range-based analysis
       c2Min = Math.min(...numValues);
       c2Max = Math.max(...numValues);
     }
