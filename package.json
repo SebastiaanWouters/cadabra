@@ -16,8 +16,8 @@
   "scripts": {
     "install:all": "bun install",
     "dev": "cd packages/cadabra && bun --hot run server.ts",
-    "test": "bun run test:cadabra && bun run test:integration",
-    "test:cadabra": "bun --filter @sebastiaanwouters/cadabra test",
+    "test": "bun run test:unit && bun run test:integration",
+    "test:unit": "bun --filter @sebastiaanwouters/cadabra test",
     "test:integration": "bun --filter cadabra-integration-tests test",
     "bench": "bun --filter cadabra-integration-tests benchmark",
     "check": "ultracite check",

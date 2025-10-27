@@ -34,7 +34,7 @@ test:
 
 # Run unit tests
 test-unit:
-	bun run test:cadabra
+	bun run test:unit
 
 # Run integration tests
 test-integration:
