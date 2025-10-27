@@ -100,8 +100,7 @@ function update_package_json() {
     fi
 
     # Use bun to update version (preserves formatting)
-    cd "$ROOT_DIR/packages/cadabra"
-    bun --bun version "$version" --no-git-tag-version >/dev/null 2>&1 || {
+    (cd "$ROOT_DIR/packages/cadabra" && bun --bun version "$version" --no-git-tag-version) >/dev/null 2>&1 || {
         # Fallback to sed if bun version fails
         sed -i.bak "s/\"version\": \".*\"/\"version\": \"$version\"/" "$file"
         rm -f "${file}.bak"
