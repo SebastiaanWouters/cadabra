@@ -41,6 +41,22 @@ jobs:
       - name: Type check
         run: bun run tsc
 
+      - name: Check NPM token is set
+        run: |
+          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "❌ ERROR: NPM_TOKEN secret is not set!"
+            echo ""
+            echo "To fix this:"
+            echo "1. Go to https://github.com/${{ github.repository }}/settings/secrets/actions"
+            echo "2. Click 'New repository secret'"
+            echo "3. Name: NPM_TOKEN"
+            echo "4. Value: Your NPM access token from https://www.npmjs.com/settings/tokens"
+            echo ""
+            echo "Create a 'Automation' token with 'Read and write' permissions"
+            exit 1
+          fi
+          echo "✓ NPM_TOKEN is set"
+
       - name: Setup Node.js for NPM
         uses: actions/setup-node@v4
         with:
