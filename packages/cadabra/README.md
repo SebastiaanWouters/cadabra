@@ -35,16 +35,16 @@ Install as a dependency in your project:
 
 ```bash
 # npm
-npm install cadabra
+npm install @sebastiaanwouters/cadabra
 
 # bun
-bun add cadabra
+bun add @sebastiaanwouters/cadabra
 
 # pnpm
-pnpm add cadabra
+pnpm add @sebastiaanwouters/cadabra
 
 # yarn
-yarn add cadabra
+yarn add @sebastiaanwouters/cadabra
 ```
 
 ### One-Off Execution
@@ -82,7 +82,7 @@ docker run -p 6942:6942 ghcr.io/sebastiaanwouters/cadabra:latest
 
 ```typescript
 // Works on Node.js, Deno, and Bun
-import { analyzeSELECT, analyzeWrite } from 'cadabra';
+import { analyzeSELECT, analyzeWrite } from '@sebastiaanwouters/cadabra';
 
 const analysis = analyzeSELECT('SELECT * FROM users WHERE id = ?', [123]);
 console.log(analysis.fingerprint); // Stable cache key
@@ -125,7 +125,7 @@ CORS_ENABLED=false cadabra
 #### Analyze SELECT Queries
 
 ```typescript
-import { analyzeSELECT } from 'cadabra';
+import { analyzeSELECT } from '@sebastiaanwouters/cadabra';
 
 const result = analyzeSELECT(
   'SELECT * FROM users WHERE status = ? ORDER BY created_at',
@@ -145,7 +145,7 @@ console.log(result);
 #### Analyze Write Operations
 
 ```typescript
-import { analyzeWrite } from 'cadabra';
+import { analyzeWrite } from '@sebastiaanwouters/cadabra';
 
 const writeOp = analyzeWrite('UPDATE users SET status = ? WHERE id = ?', ['inactive', 123]);
 
@@ -160,7 +160,7 @@ console.log(writeOp);
 #### Using CacheManager (Bun only)
 
 ```typescript
-import { CacheManager } from 'cadabra';
+import { CacheManager } from '@sebastiaanwouters/cadabra';
 
 const cache = new CacheManager();
 

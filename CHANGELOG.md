@@ -8,7 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-- Nothing yet
+- **BREAKING**: Package renamed to `@sebastiaanwouters/cadabra` (scoped package name)
+  - Original `cadabra` package name was already taken on NPM
+  - Update imports: `import { ... } from '@sebastiaanwouters/cadabra'`
+  - Update installation: `npm install @sebastiaanwouters/cadabra`
 
 ## [0.3.2] - 2025-10-27
 
