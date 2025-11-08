@@ -140,7 +140,7 @@ function formatValue(value: unknown, isInClause = false): string {
  */
 function bindParams(
   sql: string,
-  params?: unknown[] | Record<string, unknown>,
+  params?: unknown[] | Record<string, unknown>
 ): string {
   if (!params) {
     return sql;
@@ -173,7 +173,7 @@ function bindParams(
 
         // Otherwise, format normally
         return formatValue(value);
-      },
+      }
     );
   } else if (style === "$1") {
     const paramArray = Array.isArray(params) ? params : Object.values(params);
@@ -559,7 +559,7 @@ function extractJoinCondition(
   onClause: unknown,
   leftTable: string,
   rightTable: string,
-  joinType: string,
+  joinType: string
 ): JoinCondition | null {
   if (!onClause || typeof onClause !== "object") {
     return null;
@@ -630,7 +630,7 @@ function extractTables(ast: AST): TableAccess[] {
           fromItemAny.on as AST,
           previousTable || tables[0]?.table || "",
           currentTable.table,
-          joinType,
+          joinType
         );
 
         if (condition) {
@@ -732,7 +732,7 @@ function extractAggregates(ast: AST): {
  * Extracts ORDER BY clauses from AST
  */
 function extractOrderBy(
-  ast: AST,
+  ast: AST
 ): Array<{ column: string; order: "ASC" | "DESC" }> {
   const orderByClause = "orderby" in ast ? ast.orderby : null;
 
@@ -886,7 +886,7 @@ function detectSubqueryInNode(node: unknown): boolean {
 function detectSubquery(ast: AST, conditions: Condition[]): boolean {
   // Check for EXISTS/NOT EXISTS in conditions (already detected)
   const hasExistsSubquery = conditions.some(
-    (c) => c.operator === "EXISTS" || c.operator === "NOT EXISTS",
+    (c) => c.operator === "EXISTS" || c.operator === "NOT EXISTS"
   );
 
   if (hasExistsSubquery) {
@@ -932,7 +932,7 @@ function detectSubquery(ast: AST, conditions: Condition[]): boolean {
  * Detects set operations (UNION, INTERSECT, EXCEPT)
  */
 function detectSetOperation(
-  ast: AST | AST[],
+  ast: AST | AST[]
 ): "UNION" | "UNION ALL" | "INTERSECT" | "EXCEPT" | undefined {
   // Check if AST is an array (multiple statements)
   if (Array.isArray(ast)) {
@@ -986,7 +986,7 @@ function hasSimplePKCondition(conditions: Condition[]): boolean {
   return conditions.some(
     (c) =>
       ["id", "uuid"].includes(c.column.toLowerCase()) &&
-      (c.operator === "=" || c.operator === "IN"),
+      (c.operator === "=" || c.operator === "IN")
   );
 }
 
@@ -1000,7 +1000,7 @@ function classifyQuery(
     hasAggregates: boolean;
     hasSubquery: boolean;
     hasSetOperation: boolean;
-  },
+  }
 ): "row-lookup" | "aggregate" | "join" | "complex" {
   // Set operations (UNION/INTERSECT/EXCEPT) are always complex
   if (options.hasSetOperation) {
@@ -1083,7 +1083,7 @@ function generateFingerprint(cacheKey: CacheKey): string {
       const pkCondition = table.conditions?.find(
         (c) =>
           ["id", "uuid"].includes(c.column.toLowerCase()) &&
-          (c.operator === "=" || c.operator === "IN"),
+          (c.operator === "=" || c.operator === "IN")
       );
 
       if (pkCondition) {
@@ -1140,7 +1140,7 @@ function generateFingerprint(cacheKey: CacheKey): string {
  */
 function analyzeSELECT(
   sql: string,
-  params?: unknown[] | Record<string, unknown>,
+  params?: unknown[] | Record<string, unknown>
 ): CacheKey {
   // 1. Bind parameters
   const boundSQL = bindParams(sql, params);
@@ -1188,7 +1188,7 @@ function analyzeSELECT(
           // Find the table this column belongs to (by alias or name)
           if (tableRef) {
             const targetTable = tables.find(
-              (t) => t.alias === tableRef || t.table === tableRef,
+              (t) => t.alias === tableRef || t.table === tableRef
             );
             if (targetTable) {
               targetTable.columns.push(columnName);
@@ -1257,7 +1257,7 @@ function extractAffectedRows(ast: AST): string[] | undefined {
   // Look for simple equality or IN conditions on any column
   // This helps us identify specific rows affected by the write
   const specificConditions = conditions.filter(
-    (c) => c.operator === "=" || c.operator === "IN",
+    (c) => c.operator === "=" || c.operator === "IN"
   );
 
   if (specificConditions.length === 0) {
@@ -1294,7 +1294,7 @@ function extractModifiedColumns(ast: AST): string[] {
  */
 function analyzeWrite(
   sql: string,
-  params?: unknown[] | Record<string, unknown>,
+  params?: unknown[] | Record<string, unknown>
 ): InvalidationInfo {
   // 1. Bind parameters
   const boundSQL = bindParams(sql, params);
@@ -1357,7 +1357,7 @@ function rowsOverlap(cacheKey: CacheKey, affectedRows: string[]): boolean {
 
   // Look for any equality or IN conditions that might match affected rows
   const specificConditions = table.conditions.filter(
-    (c) => c.operator === "=" || c.operator === "IN",
+    (c) => c.operator === "=" || c.operator === "IN"
   );
 
   if (specificConditions.length === 0) {
@@ -1385,7 +1385,7 @@ function rowsOverlap(cacheKey: CacheKey, affectedRows: string[]): boolean {
  */
 function columnsOverlap(
   selectedColumns: string[],
-  modifiedColumns: string[],
+  modifiedColumns: string[]
 ): boolean {
   // SELECT * always overlaps
   if (selectedColumns.includes("*")) {
@@ -1406,7 +1406,7 @@ function columnsOverlap(
 function affectsJoinConditions(
   cacheKey: CacheKey,
   modifiedTable: string,
-  modifiedColumns: string[],
+  modifiedColumns: string[]
 ): boolean {
   const joinConditions = cacheKey.tables[0]?.joinConditions;
   if (!joinConditions || joinConditions.length === 0) {
@@ -1638,7 +1638,7 @@ function rangesOverlap(cond1: Condition, cond2: Condition): boolean {
  */
 function conditionsOverlap(
   cacheConditions: Condition[],
-  writeConditions: Condition[],
+  writeConditions: Condition[]
 ): boolean {
   // Group conditions by column for both sets
   const cacheByColumn = new Map<string, Condition[]>();
@@ -1693,11 +1693,11 @@ function conditionsOverlap(
  */
 function shouldInvalidate(
   cacheKey: CacheKey,
-  writeInfo: InvalidationInfo,
+  writeInfo: InvalidationInfo
 ): boolean {
   // 1. Table mismatch?
   const affectedTable = cacheKey.tables.find(
-    (t) => t.table === writeInfo.table,
+    (t) => t.table === writeInfo.table
   );
   if (!affectedTable) {
     return false;
@@ -1740,7 +1740,7 @@ function shouldInvalidate(
       // Use range analysis to determine if DELETE affects cached query
       const overlap = conditionsOverlap(
         affectedTable.conditions,
-        writeInfo.conditions,
+        writeInfo.conditions
       );
       if (!overlap) {
         return false; // Provably non-overlapping ranges, no invalidation needed
@@ -1763,7 +1763,7 @@ function shouldInvalidate(
     // 4a. Check if modified columns are in the SELECT list
     const hasColumnOverlap = columnsOverlap(
       affectedTable.columns,
-      writeInfo.modifiedColumns,
+      writeInfo.modifiedColumns
     );
 
     // 4b. For JOIN queries, also check if modified columns affect JOIN conditions
@@ -1772,7 +1772,7 @@ function shouldInvalidate(
       affectsJoinConditions(
         cacheKey,
         writeInfo.table,
-        writeInfo.modifiedColumns,
+        writeInfo.modifiedColumns
       );
 
     // If no column overlap and no join overlap, no need to invalidate
@@ -1789,7 +1789,7 @@ function shouldInvalidate(
     ) {
       const overlap = conditionsOverlap(
         affectedTable.conditions,
-        writeInfo.conditions,
+        writeInfo.conditions
       );
       if (!overlap) {
         return false; // Provably non-overlapping ranges, no invalidation needed
@@ -1834,7 +1834,7 @@ function shouldInvalidate(
   ) {
     const overlap = conditionsOverlap(
       affectedTable.conditions,
-      writeInfo.conditions,
+      writeInfo.conditions
     );
     if (!overlap) {
       return false; // Provably non-overlapping ranges
@@ -1933,88 +1933,88 @@ class CacheManager {
     this.stmts.set(
       "insertCache",
       this.db.prepare(
-        "INSERT OR REPLACE INTO cache_entries (fingerprint, result, cache_key, created_at) VALUES (?, ?, ?, ?)",
-      ),
+        "INSERT OR REPLACE INTO cache_entries (fingerprint, result, cache_key, created_at) VALUES (?, ?, ?, ?)"
+      )
     );
     this.stmts.set(
       "getCache",
       this.db.prepare(
-        "SELECT result, cache_key FROM cache_entries WHERE fingerprint = ?",
-      ),
+        "SELECT result, cache_key FROM cache_entries WHERE fingerprint = ?"
+      )
     );
     this.stmts.set(
       "deleteCache",
-      this.db.prepare("DELETE FROM cache_entries WHERE fingerprint = ?"),
+      this.db.prepare("DELETE FROM cache_entries WHERE fingerprint = ?")
     );
 
     // Index operations
     this.stmts.set(
       "insertTableIndex",
       this.db.prepare(
-        "INSERT OR IGNORE INTO table_index (table_name, fingerprint) VALUES (?, ?)",
-      ),
+        "INSERT OR IGNORE INTO table_index (table_name, fingerprint) VALUES (?, ?)"
+      )
     );
     this.stmts.set(
       "insertRowIndex",
       this.db.prepare(
-        "INSERT OR IGNORE INTO row_index (table_name, row_id, fingerprint) VALUES (?, ?, ?)",
-      ),
+        "INSERT OR IGNORE INTO row_index (table_name, row_id, fingerprint) VALUES (?, ?, ?)"
+      )
     );
     this.stmts.set(
       "insertColumnIndex",
       this.db.prepare(
-        "INSERT OR IGNORE INTO column_index (table_name, column_name, fingerprint) VALUES (?, ?, ?)",
-      ),
+        "INSERT OR IGNORE INTO column_index (table_name, column_name, fingerprint) VALUES (?, ?, ?)"
+      )
     );
     this.stmts.set(
       "insertAggregateIndex",
       this.db.prepare(
-        "INSERT OR IGNORE INTO aggregate_index (table_name, fingerprint) VALUES (?, ?)",
-      ),
+        "INSERT OR IGNORE INTO aggregate_index (table_name, fingerprint) VALUES (?, ?)"
+      )
     );
 
     // Delete index entries
     this.stmts.set(
       "deleteTableIndex",
-      this.db.prepare("DELETE FROM table_index WHERE fingerprint = ?"),
+      this.db.prepare("DELETE FROM table_index WHERE fingerprint = ?")
     );
     this.stmts.set(
       "deleteRowIndex",
-      this.db.prepare("DELETE FROM row_index WHERE fingerprint = ?"),
+      this.db.prepare("DELETE FROM row_index WHERE fingerprint = ?")
     );
     this.stmts.set(
       "deleteColumnIndex",
-      this.db.prepare("DELETE FROM column_index WHERE fingerprint = ?"),
+      this.db.prepare("DELETE FROM column_index WHERE fingerprint = ?")
     );
     this.stmts.set(
       "deleteAggregateIndex",
-      this.db.prepare("DELETE FROM aggregate_index WHERE fingerprint = ?"),
+      this.db.prepare("DELETE FROM aggregate_index WHERE fingerprint = ?")
     );
 
     // Query statements for invalidation lookups (reusable)
     this.stmts.set(
       "queryTableIndex",
       this.db.prepare(
-        "SELECT fingerprint FROM table_index WHERE table_name = ?",
-      ),
+        "SELECT fingerprint FROM table_index WHERE table_name = ?"
+      )
     );
     this.stmts.set(
       "queryRowIndex",
       this.db.prepare(
-        "SELECT fingerprint FROM row_index WHERE table_name = ? AND row_id = ?",
-      ),
+        "SELECT fingerprint FROM row_index WHERE table_name = ? AND row_id = ?"
+      )
     );
     this.stmts.set(
       "queryColumnIndex",
       this.db.prepare(
-        "SELECT fingerprint FROM column_index WHERE table_name = ? AND column_name = ?",
-      ),
+        "SELECT fingerprint FROM column_index WHERE table_name = ? AND column_name = ?"
+      )
     );
     this.stmts.set(
       "queryAggregateIndex",
       this.db.prepare(
-        "SELECT fingerprint FROM aggregate_index WHERE table_name = ?",
-      ),
+        "SELECT fingerprint FROM aggregate_index WHERE table_name = ?"
+      )
     );
   }
 
@@ -2044,7 +2044,7 @@ class CacheManager {
         // Row index (if simple PK condition)
         if (table.conditions && hasSimplePKCondition(table.conditions)) {
           const pkCond = table.conditions.find((c) =>
-            ["id", "uuid"].includes(c.column.toLowerCase()),
+            ["id", "uuid"].includes(c.column.toLowerCase())
           );
           if (pkCond) {
             const rowIds =
@@ -2240,7 +2240,7 @@ class CacheManager {
       const stmt = this.db.prepare(batchQuery);
       const rows = stmt.all(
         writeInfo.table,
-        ...writeInfo.affectedRows,
+        ...writeInfo.affectedRows
       ) as FingerprintRow[];
       for (const row of rows) {
         fingerprints.add(row.fingerprint);
@@ -2261,7 +2261,7 @@ class CacheManager {
         const colStmt = this.db.prepare(colBatchQuery);
         const colRows = colStmt.all(
           writeInfo.table,
-          ...writeInfo.modifiedColumns,
+          ...writeInfo.modifiedColumns
         ) as FingerprintRow[];
         for (const row of colRows) {
           fingerprints.add(row.fingerprint);
@@ -2332,7 +2332,7 @@ class CacheManager {
     // Get table breakdown
     const tableResults = this.db
       .prepare(
-        "SELECT table_name, COUNT(DISTINCT fingerprint) as count FROM table_index GROUP BY table_name",
+        "SELECT table_name, COUNT(DISTINCT fingerprint) as count FROM table_index GROUP BY table_name"
       )
       .all() as Array<{ table_name: string; count: number }>;
 
@@ -2471,7 +2471,7 @@ function createServer(port: number, cacheManager: CacheManager) {
               cache_key: cacheKey,
               fingerprint: cacheKey.fingerprint,
             },
-            { headers },
+            { headers }
           );
         }
 
@@ -2505,7 +2505,7 @@ function createServer(port: number, cacheManager: CacheManager) {
               result,
               hit: result !== null,
             },
-            { headers },
+            { headers }
           );
         }
 
@@ -2528,7 +2528,7 @@ function createServer(port: number, cacheManager: CacheManager) {
               success: true,
               deleted_count: deletedCount,
             },
-            { headers },
+            { headers }
           );
         }
 
@@ -2540,7 +2540,7 @@ function createServer(port: number, cacheManager: CacheManager) {
             {
               metrics,
             },
-            { headers },
+            { headers }
           );
         }
 
@@ -2548,7 +2548,7 @@ function createServer(port: number, cacheManager: CacheManager) {
       } catch (error) {
         return Response.json(
           { error: String(error) },
-          { status: 500, headers },
+          { status: 500, headers }
         );
       }
     },
